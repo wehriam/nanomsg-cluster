@@ -1,0 +1,75 @@
+{
+  "name": "nanomsg-cluster",
+  "version": "0.4.0",
+  "description": "Nanomsg based clustering",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "rm -rf ./dist; flow-remove-types ./src --out-dir ./dist;",
+    "flow-typed": "flow-typed install --overwrite",
+    "test": "yarn lint && yarn test:js",
+    "test:js": "cross-env NODE_ENV=test jest tests/*.test.js",
+    "lint": "npm run lint:js && npm run lint:flow",
+    "lint:js": "eslint -c ./.eslintrc --no-eslintrc --fix .",
+    "lint:flow": "flow --show-all-errors"
+  },
+  "jest": {
+    "verbose": true,
+    "resetModules": true,
+    "collectCoverage": true,
+    "collectCoverageFrom": [
+      "src/**/*.js"
+    ],
+    "resolver": "jest-directory-named-resolver",
+    "transform": {
+      "^.+\\.js(?:\\.flow)?$": "jest-flow-transform"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wehriam/nanomsg-cluster.git"
+  },
+  "author": "John Wehr <johnwehr@gmail.com>",
+  "license": "MIT",
+  "lint-staged": {
+    "*.js": [
+      "eslint -c .eslintrc --ignore-path .eslintignore"
+    ]
+  },
+  "pre-commit": "lint:staged",
+  "dependencies": {
+    "eslint-plugin-jest": "^21.2.0",
+    "lodash": "^4.17.4",
+    "nanomsg": "^3.3.0"
+  },
+  "devDependencies": {
+    "babel-eslint": "^8.0.1",
+    "chai": "^4.1.2",
+    "cross-env": "^5.1.0",
+    "eslint": "^4.9.0",
+    "eslint-config-bunchtogether": "^1.1.2",
+    "eslint-import-resolver-webpack": "^0.8.3",
+    "eslint-plugin-flowtype": "^2.39.1",
+    "eslint-plugin-flowtype-errors": "^3.3.4",
+    "eslint-plugin-import": "^2.8.0",
+    "eslint-plugin-jsx-a11y": "^6.0.2",
+    "eslint-plugin-react": "^7.4.0",
+    "expect": "^21.2.1",
+    "flow-bin": "^0.57.3",
+    "flow-remove-types": "^1.2.3",
+    "flow-typed": "^2.2.1",
+    "jest": "^21.2.1",
+    "jest-directory-named-resolver": "jsonnull/jest-directory-named-resolver",
+    "jest-flow-transform": "^1.0.1",
+    "lint-staged": "^4.3.0",
+    "mocha": "^4.0.1",
+    "nyc": "^11.2.1",
+    "pre-commit": "^1.2.2",
+    "sinon": "^4.0.2",
+    "sinon-chai": "^2.14.0",
+    "uuid": "^3.1.0"
+  },
+  "bugs": {
+    "url": "https://github.com/wehriam/nanomsg-cluster/issues"
+  },
+  "homepage": "https://github.com/wehriam/nanomsg-cluster"
+}
