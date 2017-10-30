@@ -76,6 +76,12 @@ const callback = (message, sender) => {
 }
 
 node.subscribe(topic, callback);
+
+// later
+
+node.subscribe(topic, callback);
+// or for all callbacks
+node.subscribe(topic);
 ```
 
 Broadcast to all nodes:
@@ -125,6 +131,11 @@ const callback = (message, sender) => {
   console.log("Sender", sender);
 }
 node.subscribe(topic, callback);
+
+// later
+
+node.stopConsumingPipeline(topic);
+node.unsubscribe(topic, callback);
 ```
 
 Add a peer:
