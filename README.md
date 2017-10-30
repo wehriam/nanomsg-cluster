@@ -114,9 +114,9 @@ Subscribe to a pipeline:
 
 ```js
 const topic = "pipeline example";
-const piplineSubscriptionPort = 14000;
+const pipelineSubscriptionPort = 14000;
 
-node.consumePipeline(piplineSubscriptionPort, topic);
+node.consumePipeline(pipelineSubscriptionPort, topic);
 
 // later
 
