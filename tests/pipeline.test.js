@@ -147,6 +147,30 @@ test('nodeC sends a message on topic2', async () => {
   expect(callback2).toHaveBeenCalledWith(message2, nameC);
 });
 
+test('nodeA unsubscribes and resubscribes to topic2', async () => {
+  nodeA.unsubscribe(topic2, callback2);
+  await messageTimeout();
+  nodeB.sendToPipeline(topic2, message2);
+  nodeC.sendToPipeline(topic2, message2);
+  await messageTimeout();
+  expect(callback2).toHaveBeenCalledTimes(2);
+  nodeA.subscribe(topic2, callback2);
+  await messageTimeout();
+  nodeB.sendToPipeline(topic2, message2);
+  nodeC.sendToPipeline(topic2, message2);
+  await messageTimeout();
+  expect(callback2).toHaveBeenCalledTimes(4);
+});
+
+test('nodeA stops consuming pipeline', async () => {
+  nodeA.stopConsumingPipeline(topic2);
+  await messageTimeout();
+  nodeB.sendToPipeline(topic2, message2);
+  nodeC.sendToPipeline(topic2, message2);
+  await messageTimeout();
+  expect(callback2).toHaveBeenCalledTimes(4);
+});
+
 test('nodeD provides topic1', async () => {
   nodeD.providePipeline(topic1);
   await messageTimeout();
@@ -175,6 +199,14 @@ test('nodeD sends a message on topic3', async () => {
   await messageTimeout();
   expect(callback3).toHaveBeenCalledTimes(1);
   expect(callback3).toHaveBeenCalledWith(message4, nameD);
+});
+
+test('nodeD stops consuming pipeline then sends a message on topic3', async () => {
+  nodeD.stopConsumingPipeline(topic3);
+  await messageTimeout();
+  nodeD.sendToPipeline(topic3, message4);
+  await messageTimeout();
+  expect(callback3).toHaveBeenCalledTimes(1);
 });
 
 test('nodeE consumes and subscribes to topic4 first', async () => {
