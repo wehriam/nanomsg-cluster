@@ -7,10 +7,11 @@
     "build": "rm -rf ./dist; flow-remove-types ./src --out-dir ./dist;",
     "flow-typed": "flow-typed install --overwrite",
     "test": "yarn lint && yarn test:js",
-    "test:js": "cross-env NODE_ENV=test jest tests/pipeline-topic.test.js",
+    "test:js": "cross-env NODE_ENV=test jest tests/pipeline.test.js",
     "lint": "npm run lint:js && npm run lint:flow",
     "lint:js": "eslint -c ./.eslintrc --no-eslintrc --fix .",
-    "lint:flow": "flow --show-all-errors"
+    "lint:flow": "flow --show-all-errors",
+    "lint:staged": "lint-staged"
   },
   "jest": {
     "verbose": true,
@@ -39,11 +40,11 @@
   "dependencies": {
     "eslint-plugin-jest": "^21.2.0",
     "lodash": "^4.17.4",
-    "nanomsg": "^3.3.0"
+    "nanomsg": "^3.3.0",
+    "uuid": "^3.1.0"
   },
   "devDependencies": {
     "babel-eslint": "^8.0.1",
-    "chai": "^4.1.2",
     "cross-env": "^5.1.0",
     "eslint": "^4.9.0",
     "eslint-config-bunchtogether": "^1.1.2",
@@ -63,10 +64,7 @@
     "lint-staged": "^4.3.0",
     "mocha": "^4.0.1",
     "nyc": "^11.2.1",
-    "pre-commit": "^1.2.2",
-    "sinon": "^4.0.2",
-    "sinon-chai": "^2.14.0",
-    "uuid": "^3.1.0"
+    "pre-commit": "^1.2.2"
   },
   "bugs": {
     "url": "https://github.com/wehriam/nanomsg-cluster/issues"

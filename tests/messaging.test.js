@@ -85,7 +85,7 @@ test('subscribes to a topic', async () => {
 });
 
 test('nodeB sends a message', async () => {
-  nodeB.send(topic1, message1);
+  nodeB.sendToAll(topic1, message1);
   await messageTimeout();
 });
 
@@ -96,7 +96,7 @@ test('nodeA and nodeC have received the message', () => {
 });
 
 test('nodeC sends a message', async () => {
-  nodeC.send(topic1, message2);
+  nodeC.sendToAll(topic1, message2);
   await messageTimeout();
 });
 
@@ -108,8 +108,8 @@ test('nodeA and nodeB have received the message', () => {
 
 
 test('nodeA and nodeC send messages at the same time', async () => {
-  nodeC.send(topic1, message3);
-  nodeA.send(topic1, message4);
+  nodeC.sendToAll(topic1, message3);
+  nodeA.sendToAll(topic1, message4);
   await messageTimeout();
 });
 
@@ -121,13 +121,13 @@ test('nodeA and nodeB have received the message', () => {
 });
 
 test('nodeA sends a message', async () => {
-  nodeA.send(topic1, message5);
+  nodeA.sendToAll(topic1, message5);
   await messageTimeout();
   expect(callbackA).not.toHaveBeenCalledWith(message5);
 });
 
 test('only connector c has received the message', async () => {
-  nodeA.sendDirect(nameC, topic1, message6);
+  nodeA.sendToPeer(nameC, topic1, message6);
   await messageTimeout();
   expect(callbackA).not.toHaveBeenCalledWith(message6, nameA);
   expect(callbackB).not.toHaveBeenCalledWith(message6, nameA);
@@ -140,7 +140,7 @@ test('should remove a peerAddress from the cluster', async () => {
   nodeC.subscribe(topic2, callbackC);
   nodeC.removePeer(addressA);
   await messageTimeout();
-  nodeA.send(topic2, message7);
+  nodeA.sendToAll(topic2, message7);
   expect(callbackA).not.toHaveBeenCalledWith(message7);
   expect(callbackB).not.toHaveBeenCalledWith(message7);
   expect(callbackC).not.toHaveBeenCalledWith(message7);

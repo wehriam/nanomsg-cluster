@@ -1,6 +1,6 @@
 // @flow
 
-
+const uuid = require('uuid');
 const nano = require('nanomsg');
 const events = require('events');
 const { merge } = require('lodash');
@@ -36,7 +36,7 @@ type Options = {
     bindAddress?: SocketSettings,
     peerAddresses?: Array<SocketSettings>,
   },
-  name: string
+  name?: string
 };
 
 const DEFAULT_PUBSUB_PORT = 13001;
@@ -60,9 +60,10 @@ class ClusterNode extends events.EventEmitter {
   pushSockets: {[string]:ConnectSocket};
   pubSocket: BindSocket;
   subSockets: {[string]:ConnectSocket};
-  pushTopicSockets: {[string]:ConnectSocket};
-  namedPushTopicSockets: {[string]:ConnectSocket};
-  pullTopicSockets: {[string]:BindSocket};
+  pipelinePushSockets: {[string]:ConnectSocket};
+  namedPipelinePushSockets: {[string]:ConnectSocket};
+  pipelinePullSockets: {[string]:BindSocket};
+  pipelinePullBindAddress: {[string]:string};
   name: string;
   subscriptions: {[string]:Function};
   boundReceiveMessage: Function;
@@ -72,12 +73,12 @@ class ClusterNode extends events.EventEmitter {
   closed: boolean;
   clusterUpdateTimeout: number;
 
-  constructor(options:Options) {
+  constructor(options?:Options = {}) {
     super();
     this.options = options;
     this.isReady = false;
     this.subscriptions = {};
-    this.name = options.name;
+    this.name = options.name || uuid.v4();
     this.boundReceiveMessage = this.receiveMessage.bind(this);
     const clusterOptions = merge({
       bindAddress: {
@@ -88,7 +89,7 @@ class ClusterNode extends events.EventEmitter {
       peerAddresses: [],
     }, options.cluster);
     // String version of this node address.
-    this.socketHash = getSocketHash(options.name, clusterOptions.bindAddress);
+    this.socketHash = getSocketHash(this.name, clusterOptions.bindAddress);
     // String versions of peer addresses.
     this.peerSocketHashes = {};
     // Bind a nanomsg pull socket for incoming direct messages
@@ -97,11 +98,11 @@ class ClusterNode extends events.EventEmitter {
     this.pullSocket = nano.socket('pull');
     this.pullSocket.bind(pullBindAddress);
     this.pullSocket.on('error', function (error) {
-      this.emit('error', `Nanomsg pull socket "${pullBindAddress}": ${error.message}`);
+      this.emit('error', `Pull socket "${pullBindAddress}": ${error.message}`);
     });
     this.pullSocket.on('data', this.boundReceiveMessage);
     if (this.pullSocket.bound[pullBindAddress] <= -1) {
-      this.emit('error', `Nanomsg: Could not bind pull socket to ${pullBindAddress}`);
+      this.emit('error', `Could not bind pull socket to ${pullBindAddress}`);
     }
     // Bind a Nanomsg pub socket for outgoing messages to all nodes
     // http://nanomsg.org/v1.0.0/nn_pubsub.7.html
@@ -109,10 +110,10 @@ class ClusterNode extends events.EventEmitter {
     this.pubSocket = nano.socket('pub');
     this.pubSocket.bind(pubsubBindAddress);
     this.pubSocket.on('error', function (error) {
-      this.emit('error', `Nanomsg pub socket: ${error.message}`);
+      this.emit('error', `Pub socket: ${error.message}`);
     });
     if (this.pubSocket.bound[pubsubBindAddress] <= -1) {
-      this.emit('error', `Nanomsg: Could not bind pub socket to ${pubsubBindAddress}`);
+      this.emit('error', `Could not bind pub socket to ${pubsubBindAddress}`);
     }
     // Nanomsg sub sockets for incoming messages from all nodes
     // http://nanomsg.org/v1.0.0/nn_pubsub.7.html
@@ -130,14 +131,15 @@ class ClusterNode extends events.EventEmitter {
     // Nanomsg push and pull sockets for pipeline topics
     // http://nanomsg.org/v1.0.0/nn_pipeline.7.html
     // Socket object is keyed to the topic 
-    // i.e.: this.pushTopicSockets['topic'] = nano.socket('push')
-    // i.e.: this.namedPushTopicSockets['topic' + name] = this.pushTopicSockets['topic']
-    // i.e.: this.pullTopicSockets['topic'] = nano.socket('pull')
-    this.pushTopicSockets = {};
-    this.namedPushTopicSockets = {};
-    this.pullTopicSockets = {};
+    // i.e.: this.pipelinePushSockets['topic'] = nano.socket('push')
+    // i.e.: this.namedPipelinePushSockets['topic' + name] = this.pipelinePushSockets['topic']
+    // i.e.: this.pipelinePullSockets['topic'] = nano.socket('pull')
+    this.pipelinePushSockets = {};
+    this.namedPipelinePushSockets = {};
+    this.pipelinePullSockets = {};
+    this.pipelinePullBindAddress = {};
     // Messaging about peers
-    this.subscribe('_clusterAddPeers', (message) => {
+    this.subscribe('_clusterAddPeers', (message:Object) => {
       const peerSocketHashes = [message.socketHash].concat(message.peerSocketHashes.filter((peerSocketHash) => this.socketHash !== peerSocketHash));
       peerSocketHashes.forEach((socketHash) => {
         const name = socketHash.split('/').shift();
@@ -145,22 +147,21 @@ class ClusterNode extends events.EventEmitter {
         this.namedPushSockets[name] = this.addPeer(getSocketSettings(socketHash));
       });
     });
-    this.subscribe('_clusterRemovePeer', (message) => {
+    this.subscribe('_clusterRemovePeer', (message:Object) => {
       this.removePeer(getSocketSettings(message.socketHash));
     });
-    this.subscribe('_clusterAddPipelineTopicConsumer', (message, name) => {
+    this.subscribe('_clusterAddPipelineConsumer', (message:Object, name:string) => {
       const { topic, pushConnectAddress } = message;
-      if (this.pushTopicSockets[topic]) {
-        const push = this.pushTopicSockets[topic];
-        if (typeof push.connected[pushConnectAddress] !== 'undefined') {
-          return;
-        }
-        push.connect(pushConnectAddress);
-        if (push.connected[pushConnectAddress] <= -1) {
-          throw new Error(`Could not connect topic "${topic}" for push socket to ${pushConnectAddress}`);
-        }
-        this.namedPushTopicSockets[name] = this.namedPushTopicSockets[name] || {};
-        this.namedPushTopicSockets[name][topic] = pushConnectAddress;
+      this.connectPipelineConsumer(topic, pushConnectAddress, name);
+    });
+    this.subscribe('_clusterAddPipelineProvider', (message:Object) => {
+      const { topic } = message;
+      const pushConnectAddress = this.pipelinePullBindAddress[topic];
+      if (pushConnectAddress) {
+        this.sendToAll('_clusterAddPipelineConsumer', {
+          topic,
+          pushConnectAddress,
+        });
       }
     });
     // Connect to peers included in the options
@@ -181,7 +182,7 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  sendDirect(name:string, topic:string, message:any):void {
+  sendToPeer(name:string, topic:string, message:any):void {
     const push = this.namedPushSockets[name];
     if (!push) {
       this.emit('error', `${this.name} is unable to send message "${topic}":"${JSON.stringify(message)}" to "${name}"`);
@@ -190,12 +191,12 @@ class ClusterNode extends events.EventEmitter {
     push.send(JSON.stringify([topic, message, this.name]));
   }
 
-  send(topic:string, message:any):void {
+  sendToAll(topic:string, message:any):void {
     this.pubSocket.send(JSON.stringify([topic, message, this.name]));
   }
 
-  sendPipeline(topic:string, message:any):void {
-    const push = this.pushTopicSockets[topic];
+  sendToPipeline(topic:string, message:any):void {
+    const push = this.pipelinePushSockets[topic];
     if (!push) {
       throw new Error(`Not providing pipeline "${topic}"`);
     }
@@ -209,17 +210,17 @@ class ClusterNode extends events.EventEmitter {
 
   async close():Promise<void> {
     if (this.closed) {
-      throw new Error('ClusterNode already closed.');
+      throw new Error('Already closed.');
     }
     if (this.clusterUpdateTimeout) {
       clearTimeout(this.clusterUpdateTimeout);
     }
-    this.send('_clusterRemovePeer', {
+    this.sendToAll('_clusterRemovePeer', {
       socketHash: this.socketHash,
     });
     await new Promise((resolve) => setTimeout(resolve, 100));
-    await Promise.all(Object.keys(this.pushTopicSockets).map(this.closePushTopicConnectSocket.bind(this)));
-    await Promise.all(Object.keys(this.pullTopicSockets).map(this.closePullTopicSocket.bind(this)));
+    await Promise.all(Object.keys(this.pipelinePushSockets).map(this.closePipelinePushSocket.bind(this)));
+    await Promise.all(Object.keys(this.pipelinePullSockets).map(this.closePipelinePullSocket.bind(this)));
     this.pullSocket.removeListener('data', this.boundReceiveMessage);
     await new Promise((resolve) => {
       this.pullSocket.on('close', resolve);
@@ -229,8 +230,8 @@ class ClusterNode extends events.EventEmitter {
       this.pubSocket.on('close', resolve);
       this.pubSocket.close();
     });
-    await Promise.all(Object.keys(this.subSockets).map(this.closeSubConnectSocket.bind(this)));
-    await Promise.all(Object.keys(this.pushSockets).map(this.closePushConnectSocket.bind(this)));
+    await Promise.all(Object.keys(this.subSockets).map(this.closeSubSocket.bind(this)));
+    await Promise.all(Object.keys(this.pushSockets).map(this.closePushSocket.bind(this)));
     this.closed = true;
     this.emit('close');
   }
@@ -245,7 +246,7 @@ class ClusterNode extends events.EventEmitter {
     if (!this.subSockets[pubsubConnectAddress]) {
       const sub = nano.socket('sub');
       sub.on('error', function (error) {
-        this.emit('error', `Nanomsg sub socket "${pubsubConnectAddress}": ${error.message}`);
+        this.emit('error', `Sub socket "${pubsubConnectAddress}": ${error.message}`);
       });
       sub.connect(pubsubConnectAddress);
       if (sub.connected[pubsubConnectAddress] <= -1) {
@@ -257,7 +258,7 @@ class ClusterNode extends events.EventEmitter {
     if (!this.pushSockets[pushConnectAddress]) {
       const push = nano.socket('push');
       push.on('error', function (error) {
-        this.emit('error', `Nanomsg push socket "${pushConnectAddress}": ${error.message}`);
+        this.emit('error', `Push socket "${pushConnectAddress}": ${error.message}`);
       });
       push.connect(pushConnectAddress);
       if (push.connected[pushConnectAddress] <= -1) {
@@ -273,7 +274,7 @@ class ClusterNode extends events.EventEmitter {
       clearTimeout(this.clusterUpdateTimeout);
     }
     this.clusterUpdateTimeout = setTimeout(() => {
-      this.send('_clusterAddPeers', {
+      this.sendToAll('_clusterAddPeers', {
         socketHash: this.socketHash,
         peerSocketHashes: Object.keys(this.peerSocketHashes),
       });
@@ -294,26 +295,26 @@ class ClusterNode extends events.EventEmitter {
         delete this.namedPushSockets[name];
         const socketHash = getSocketHash(name, peerAddress);
         delete this.peerSocketHashes[socketHash];
-        this.send('_clusterRemovePeer', {
+        this.sendToAll('_clusterRemovePeer', {
           socketHash,
         });
-        if (this.namedPushTopicSockets[name]) {
-          Object.keys(this.namedPushTopicSockets[name]).forEach((topic:string) => {
-            const address = this.namedPushTopicSockets[name][topic];
-            delete this.namedPushTopicSockets[name][topic];
-            this.shutdownPushTopicConnectAddress(topic, address);
+        if (this.namedPipelinePushSockets[name]) {
+          Object.keys(this.namedPipelinePushSockets[name]).forEach((topic:string) => {
+            const address = this.namedPipelinePushSockets[name][topic];
+            delete this.namedPipelinePushSockets[name][topic];
+            this.shutdownPipelinePushAddress(topic, address);
           });
         }
       }
     });
     await Promise.all([
-      this.closeSubConnectSocket(pubsubConnectAddress),
-      this.closePushConnectSocket(pushConnectAddress),
+      this.closeSubSocket(pubsubConnectAddress),
+      this.closePushSocket(pushConnectAddress),
     ]);
     this.emit('removePeer', peerAddress);
   }
 
-  async closeSubConnectSocket(address:string):Promise<void> {
+  async closeSubSocket(address:string):Promise<void> {
     const sub = this.subSockets[address];
     delete this.subSockets[address];
     sub.removeListener('data', this.boundReceiveMessage);
@@ -324,7 +325,7 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  async closePushConnectSocket(address:string):Promise<void> {
+  async closePushSocket(address:string):Promise<void> {
     const push = this.pushSockets[address];
     delete this.pushSockets[address];
     await new Promise((resolve, reject) => {
@@ -334,8 +335,8 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  shutdownPushTopicConnectAddress(topic:string, address:string):void {
-    const push = this.pushTopicSockets[topic];
+  shutdownPipelinePushAddress(topic:string, address:string):void {
+    const push = this.pipelinePushSockets[topic];
     if (!push) {
       return;
     }
@@ -348,9 +349,9 @@ class ClusterNode extends events.EventEmitter {
     }
   }
 
-  async closePushTopicConnectSocket(topic:string):Promise<void> {
-    const push = this.pushTopicSockets[topic];
-    delete this.pushTopicSockets[topic];
+  async closePipelinePushSocket(topic:string):Promise<void> {
+    const push = this.pipelinePushSockets[topic];
+    delete this.pipelinePushSockets[topic];
     await new Promise((resolve, reject) => {
       push.on('close', resolve);
       push.on('error', reject);
@@ -358,8 +359,10 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  async closePullTopicSocket(topic:string):Promise<void> {
-    const pullSocket = this.pullTopicSockets[topic];
+  async closePipelinePullSocket(topic:string):Promise<void> {
+    const pullSocket = this.pipelinePullSockets[topic];
+    delete this.pipelinePullSockets[topic];
+    delete this.pipelinePullBindAddress[topic];
     if (!pullSocket) {
       return;
     }
@@ -370,35 +373,62 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  async providePipelineTopic(topic: string) {
-    if (!this.pushTopicSockets[topic]) {
-      const push = nano.socket('push');
-      push.on('error', function (error) {
-        this.emit('error', `Nanomsg push topic socket "${topic}": ${error.message}`);
-      });
-      this.pushTopicSockets[topic] = push;
+  connectPipelineConsumer(topic: string, address: string, name: string):void {
+    if (!this.pipelinePushSockets[topic]) {
+      return;
+    }
+    const push = this.pipelinePushSockets[topic];
+    if (typeof push.connected[address] !== 'undefined') {
+      return;
+    }
+    push.connect(address);
+    if (push.connected[address] <= -1) {
+      throw new Error(`Could not connect topic "${topic}" for push socket to ${address}`);
+    }
+    this.namedPipelinePushSockets[name] = this.namedPipelinePushSockets[name] || {};
+    this.namedPipelinePushSockets[name][topic] = address;
+  }
+
+  async providePipeline(topic: string) {
+    if (this.pipelinePushSockets[topic]) {
+      return;
+    }
+    const push = nano.socket('push');
+    push.on('error', function (error) {
+      this.emit('error', `Pipeline push socket for topic "${topic}": ${error.message}`);
+    });
+    this.pipelinePushSockets[topic] = push;
+    this.sendToAll('_clusterAddPipelineProvider', {
+      topic,
+    });
+    if (this.pipelinePullSockets[topic]) {
+      this.connectPipelineConsumer(topic, this.pipelinePullBindAddress[topic], this.name);
     }
   }
 
-  async subscribePipelineTopic(port: number, topic: string, callback: Function) {
-    if (!this.pullTopicSockets[topic]) {
-      const { host } = getSocketSettings(this.socketHash);
-      const pullBindAddress = `tcp://${host}:${port}`;
-      const pullSocket = nano.socket('pull');
-      pullSocket.bind(pullBindAddress);
-      pullSocket.on('error', function (error) {
-        this.emit('error', `Nanomsg pull socket for topic "${topic}" at "${pullBindAddress}": ${error.message}`);
-      });
-      pullSocket.on('data', this.boundReceiveMessage);
-      if (pullSocket.bound[pullBindAddress] <= -1) {
-        this.emit('error', `Nanomsg: Could not bind pull socket topic "${topic}" to ${pullBindAddress}`);
-      }
-      this.pullTopicSockets[topic] = pullSocket;
-      this.subscribe(topic, callback);
-      this.send('_clusterAddPipelineTopicConsumer', {
-        topic,
-        pushConnectAddress: pullBindAddress,
-      });
+  async consumePipeline(port: number, topic: string) {
+    if (this.pipelinePullSockets[topic]) {
+      return;
+    }
+    const { host } = getSocketSettings(this.socketHash);
+    const pullBindAddress = `tcp://${host}:${port}`;
+    const pullSocket = nano.socket('pull');
+    pullSocket.bind(pullBindAddress);
+    pullSocket.on('error', function (error) {
+      this.emit('error', `Pipeline pull socket for topic "${topic}" at "${pullBindAddress}": ${error.message}`);
+    });
+    pullSocket.on('data', this.boundReceiveMessage);
+    if (pullSocket.bound[pullBindAddress] <= -1) {
+      this.emit('error', `Could not bind pipeline pull socket for topic "${topic}" to ${pullBindAddress}`);
+    }
+    this.pipelinePullSockets[topic] = pullSocket;
+    this.pipelinePullBindAddress[topic] = pullBindAddress;
+    this.sendToAll('_clusterAddPipelineConsumer', {
+      topic,
+      pushConnectAddress: pullBindAddress,
+    });
+    if (this.pipelinePushSockets[topic]) {
+      this.connectPipelineConsumer(topic, pullBindAddress, this.name);
     }
   }
 
