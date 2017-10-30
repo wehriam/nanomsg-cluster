@@ -105,6 +105,7 @@ const topic = "pipeline example";
 node.providePipeline(topic);
 
 // later
+
 const message = {foo: "bar"};
 node.sendToPipeline(topic, message);
 ```
@@ -114,12 +115,16 @@ Subscribe to a pipeline:
 ```js
 const topic = "pipeline example";
 const piplineSubscriptionPort = 14000;
+
+node.consumePipeline(piplineSubscriptionPort, topic);
+
+// later
+
 const callback = (message, sender) => {
   console.log("Message", message);
   console.log("Sender", sender);
 }
-
-node.providePipeline(piplineSubscriptionPort, topic, callback);
+node.subscribe(topic, callback);
 ```
 
 Add a peer:
