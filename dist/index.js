@@ -65,7 +65,7 @@ class ClusterNode extends events.EventEmitter {
                                              
                                              
                
-                                     
+                                            
                                 
                      
                                        
@@ -154,6 +154,10 @@ class ClusterNode extends events.EventEmitter {
       const { topic, pushConnectAddress } = message;
       this.connectPipelineConsumer(topic, pushConnectAddress, name);
     });
+    this.subscribe('_clusterRemovePipelineConsumer', (message       , name       ) => {
+      const { topic } = message;
+      this.disconnectPipelineConsumer(topic, name);
+    });
     this.subscribe('_clusterAddPipelineProvider', (message       ) => {
       const { topic } = message;
       const pushConnectAddress = this.pipelinePullBindAddress[topic];
@@ -206,6 +210,15 @@ class ClusterNode extends events.EventEmitter {
   subscribe(topic       , callback         )      {
     this.subscriptions[topic] = this.subscriptions[topic] || [];
     this.subscriptions[topic].push(callback);
+  }
+
+  unsubscribe(topic       , callback          )      {
+    this.subscriptions[topic] = this.subscriptions[topic] || [];
+    if (callback) {
+      this.subscriptions[topic] = this.subscriptions[topic].filter((cb) => cb !== callback);
+      return;
+    }
+    this.subscriptions[topic] = [];
   }
 
   async close()               {
@@ -300,9 +313,7 @@ class ClusterNode extends events.EventEmitter {
         });
         if (this.namedPipelinePushSockets[name]) {
           Object.keys(this.namedPipelinePushSockets[name]).forEach((topic       ) => {
-            const address = this.namedPipelinePushSockets[name][topic];
-            delete this.namedPipelinePushSockets[name][topic];
-            this.shutdownPipelinePushAddress(topic, address);
+            this.disconnectPipelineConsumer(topic, name);
           });
         }
       }
@@ -373,6 +384,18 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
+  disconnectPipelineConsumer(topic        , name        )       {
+    if (!this.namedPipelinePushSockets[name]) {
+      return;
+    }
+    const address = this.namedPipelinePushSockets[name][topic];
+    delete this.namedPipelinePushSockets[name][topic];
+    if (!address) {
+      return;
+    }
+    this.shutdownPipelinePushAddress(topic, address);
+  }
+
   connectPipelineConsumer(topic        , address        , name        )      {
     if (!this.pipelinePushSockets[topic]) {
       return;
@@ -389,7 +412,7 @@ class ClusterNode extends events.EventEmitter {
     this.namedPipelinePushSockets[name][topic] = address;
   }
 
-  async providePipeline(topic        ) {
+  providePipeline(topic        ) {
     if (this.pipelinePushSockets[topic]) {
       return;
     }
@@ -406,7 +429,7 @@ class ClusterNode extends events.EventEmitter {
     }
   }
 
-  async consumePipeline(port        , topic        ) {
+  consumePipeline(port        , topic        ) {
     if (this.pipelinePullSockets[topic]) {
       return;
     }
@@ -430,6 +453,12 @@ class ClusterNode extends events.EventEmitter {
     if (this.pipelinePushSockets[topic]) {
       this.connectPipelineConsumer(topic, pullBindAddress, this.name);
     }
+  }
+
+  async stopConsumingPipeline(topic        ) {
+    this.sendToAll('_clusterRemovePipelineConsumer', { topic });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await this.closePipelinePullSocket(topic);
   }
 
   getPeers()                                         {

@@ -1,6 +1,6 @@
 {
   "name": "nanomsg-cluster",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Nanomsg based clustering",
   "main": "dist/index.js",
   "scripts": {
@@ -36,7 +36,7 @@
       "eslint -c .eslintrc --ignore-path .eslintignore"
     ]
   },
-  "pre-commit": "lint:staged",
+  "pre-commit": ["lint:staged", "build"],
   "dependencies": {
     "eslint-plugin-jest": "^21.2.0",
     "lodash": "^4.17.4",
