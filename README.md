@@ -171,4 +171,11 @@ node.getPeers();
 // ]
 ```
 
+Leave the cluster and close sockets:
+
+```js
+// Returns a Promise.
+node.close();
+```
+
 
