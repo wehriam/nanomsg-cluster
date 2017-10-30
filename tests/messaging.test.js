@@ -91,7 +91,7 @@ test('nodeB sends a message', async () => {
 
 test('nodeA and nodeC have received the message', () => {
   expect(callbackA).toHaveBeenCalledWith(message1, nameB);
-  expect(callbackB).toHaveBeenCalledTimes(0); // eslint-disable-line no-unused-expressions
+  expect(callbackB).toHaveBeenCalledTimes(0);
   expect(callbackC).toHaveBeenCalledWith(message1, nameB);
 });
 
