@@ -76,6 +76,7 @@ const callback = (message, sender) => {
 }
 
 node.subscribe(topic, callback);
+node.subscribe(topic, callback, true); // include local broadcasts
 
 // later
 

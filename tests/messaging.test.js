@@ -55,12 +55,14 @@ let nodeA;
 let nodeB;
 let nodeC;
 const callbackA = jest.fn();
+const callbackAA = jest.fn();
 const callbackB = jest.fn();
 const callbackC = jest.fn();
 const nameA = uuid.v4();
 const nameB = uuid.v4();
 const nameC = uuid.v4();
 const topic1 = uuid.v4();
+const topic1A = uuid.v4();
 const topic2 = uuid.v4();
 const message1 = { [uuid.v4()]: uuid.v4() };
 const message2 = { [uuid.v4()]: uuid.v4() };
@@ -69,6 +71,8 @@ const message4 = { [uuid.v4()]: uuid.v4() };
 const message5 = { [uuid.v4()]: uuid.v4() };
 const message6 = { [uuid.v4()]: uuid.v4() };
 const message7 = { [uuid.v4()]: uuid.v4() };
+const message8 = { [uuid.v4()]: uuid.v4() };
+const message9 = { [uuid.v4()]: uuid.v4() };
 
 beforeAll(async () => {
   nodeA = await getNode(nameA, addressA, []);
@@ -106,7 +110,6 @@ test('nodeA and nodeB have received the message', () => {
   expect(callbackC).toHaveBeenCalledWith(message1, nameB);
 });
 
-
 test('nodeA and nodeC send messages at the same time', async () => {
   nodeC.sendToAll(topic1, message3);
   nodeA.sendToAll(topic1, message4);
@@ -118,6 +121,23 @@ test('nodeA and nodeB have received the message', () => {
   expect(callbackB).toHaveBeenCalledWith(message4, nameA);
   expect(callbackB).toHaveBeenCalledWith(message3, nameC);
   expect(callbackC).toHaveBeenCalledWith(message4, nameA);
+});
+
+test('nodeA sends a message to itself', async () => {
+  nodeA.subscribe(topic1A, callbackAA, true);
+  nodeB.subscribe(topic1A, callbackB, true);
+  nodeA.sendToAll(topic1A, message8);
+  await messageTimeout();
+  expect(callbackAA).toHaveBeenCalledWith(message8, nameA);
+  expect(callbackB).toHaveBeenCalledWith(message8, nameA);
+});
+
+test('nodeA unsubscribes from messages to itself', async () => {
+  nodeA.unsubscribe(topic1A, callbackAA);
+  nodeA.sendToAll(topic1A, message9);
+  await messageTimeout();
+  expect(callbackAA).not.toHaveBeenCalledWith(message9, nameA);
+  expect(callbackB).toHaveBeenCalledWith(message9, nameA);
 });
 
 test('nodeA sends a message', async () => {
@@ -153,7 +173,7 @@ test('nodeB can not be closed more than once.', async () => {
   } catch (e) {
     expect(() => {
       throw e;
-    }).toThrow(/ClusterNode already closed/);
+    }).toThrow(/Already closed/);
   }
   await messageTimeout();
 });
