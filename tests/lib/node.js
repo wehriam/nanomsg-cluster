@@ -8,10 +8,8 @@ const ClusterNode = require('../../src');
 module.exports.getNode = async (name:string, bindAddress:SocketSettings, peerAddresses:Array<SocketSettings>):Promise<ClusterNode> => {
   const node = new ClusterNode({
     name,
-    cluster: {
-      bindAddress,
-      peerAddresses,
-    },
+    bindAddress,
+    peerAddresses,
   });
   expect(node.isReady).toEqual(false);
   await new Promise((resolve) => {

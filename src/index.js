@@ -89,7 +89,7 @@ class ClusterNode extends events.EventEmitter {
         pipelinePort: DEFAULT_PIPELINE_PORT,
       },
       peerAddresses: [],
-    }, options.cluster);
+    }, options);
     // String version of this node address.
     this.socketHash = getSocketHash(this.name, clusterOptions.bindAddress);
     // String versions of peer addresses.
