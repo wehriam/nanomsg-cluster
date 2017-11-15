@@ -1,10 +1,8 @@
 // @flow
 
-import type { SocketSettings } from '../src';
-
 const uuid = require('uuid');
 const expect = require('expect');
-const ClusterNode = require('../src');
+const { messageTimeout, getNode } = require('./lib/node');
 
 const HOST = '127.0.0.1';
 const NANOMSG_PUBSUB_PORT_A = 7789;
@@ -30,25 +28,6 @@ const addressC = {
   host: HOST,
   pubsubPort: NANOMSG_PUBSUB_PORT_C,
   pipelinePort: NANOMSG_PIPELINE_PORT_C,
-};
-
-const messageTimeout = () => new Promise((resolve) => setTimeout(resolve, 250));
-
-const getNode = async (name:string, bindAddress:SocketSettings, peerAddresses:Array<SocketSettings>):Promise<ClusterNode> => {
-  const node = new ClusterNode({
-    name,
-    cluster: {
-      bindAddress,
-      peerAddresses,
-    },
-  });
-  expect(node.isReady).toEqual(false);
-  await new Promise((resolve, reject) => {
-    node.on('ready', resolve);
-    node.on('error', reject);
-  });
-  expect(node.isReady).toEqual(true);
-  return node;
 };
 
 let nodeA;

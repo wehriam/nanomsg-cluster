@@ -1,13 +1,13 @@
 {
   "name": "nanomsg-cluster",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Nanomsg based clustering",
   "main": "dist/index.js",
   "scripts": {
     "build": "rm -rf ./dist; flow-remove-types ./src --out-dir ./dist;",
     "flow-typed": "flow-typed install --overwrite",
     "test": "yarn lint && yarn test:js",
-    "test:js": "cross-env NODE_ENV=test jest tests",
+    "test:js": "cross-env NODE_ENV=test jest --runInBand tests",
     "lint": "npm run lint:js && npm run lint:flow",
     "lint:js": "eslint -c ./.eslintrc --no-eslintrc --fix .",
     "lint:flow": "flow --show-all-errors",

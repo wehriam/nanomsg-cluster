@@ -98,8 +98,13 @@ class ClusterNode extends events.EventEmitter {
     // http://nanomsg.org/v1.0.0/nn_pipeline.7.html
     const pullBindAddress = `tcp://${clusterOptions.bindAddress.host}:${clusterOptions.bindAddress.pipelinePort}`;
     this.pullSocket = nano.socket('pull');
-    this.pullSocket.bind(pullBindAddress);
-    this.pullSocket.on('error', function (error) {
+    try {
+      this.pullSocket.bind(pullBindAddress);
+    } catch (error) {
+      error.message = `Could not bind pull socket to ${pullBindAddress}: ${error.message}`;
+      throw error;
+    }
+    this.pullSocket.on('error', (error) => {
       this.emit('error', `Pull socket "${pullBindAddress}": ${error.message}`);
     });
     this.pullSocket.on('data', this.boundReceiveMessage);
@@ -110,8 +115,13 @@ class ClusterNode extends events.EventEmitter {
     // http://nanomsg.org/v1.0.0/nn_pubsub.7.html
     const pubsubBindAddress = `tcp://${clusterOptions.bindAddress.host}:${clusterOptions.bindAddress.pubsubPort}`;
     this.pubSocket = nano.socket('pub');
-    this.pubSocket.bind(pubsubBindAddress);
-    this.pubSocket.on('error', function (error) {
+    try {
+      this.pubSocket.bind(pubsubBindAddress);
+    } catch (error) {
+      error.message = `Could not bind pub socket to ${pubsubBindAddress}: ${error.message}`;
+      throw error;
+    }
+    this.pubSocket.on('error', (error) => {
       this.emit('error', `Pub socket: ${error.message}`);
     });
     if (this.pubSocket.bound[pubsubBindAddress] <= -1) {
@@ -273,10 +283,15 @@ class ClusterNode extends events.EventEmitter {
     }
     if (!this.subSockets[pubsubConnectAddress]) {
       const sub = nano.socket('sub');
-      sub.on('error', function (error) {
+      sub.on('error', (error) => {
         this.emit('error', `Sub socket "${pubsubConnectAddress}": ${error.message}`);
       });
-      sub.connect(pubsubConnectAddress);
+      try {
+        sub.connect(pubsubConnectAddress);
+      } catch (error) {
+        error.message = `Could not connect sub socket to ${pubsubConnectAddress}: ${error.message}`;
+        throw error;
+      }
       if (sub.connected[pubsubConnectAddress] <= -1) {
         throw new Error(`Could not connect sub socket to ${pubsubConnectAddress}`);
       }
@@ -285,10 +300,15 @@ class ClusterNode extends events.EventEmitter {
     }
     if (!this.pushSockets[pushConnectAddress]) {
       const push = nano.socket('push');
-      push.on('error', function (error) {
+      push.on('error', (error) => {
         this.emit('error', `Push socket "${pushConnectAddress}": ${error.message}`);
       });
-      push.connect(pushConnectAddress);
+      try {
+        push.connect(pushConnectAddress);
+      } catch (error) {
+        error.message = `Could not connect push socket to ${pushConnectAddress}: ${error.message}`;
+        throw error;
+      }
       if (push.connected[pushConnectAddress] <= -1) {
         throw new Error(`Could not connect push socket to ${pushConnectAddress}`);
       }
@@ -419,7 +439,12 @@ class ClusterNode extends events.EventEmitter {
     if (typeof push.connected[address] !== 'undefined') {
       return;
     }
-    push.connect(address);
+    try {
+      push.connect(address);
+    } catch (error) {
+      error.message = `Could not connect topic "${topic}" for push socket to ${address}: ${error.message}`;
+      throw error;
+    }
     if (push.connected[address] <= -1) {
       throw new Error(`Could not connect topic "${topic}" for push socket to ${address}`);
     }
@@ -432,7 +457,7 @@ class ClusterNode extends events.EventEmitter {
       return;
     }
     const push = nano.socket('push');
-    push.on('error', function (error) {
+    push.on('error', (error) => {
       this.emit('error', `Pipeline push socket for topic "${topic}": ${error.message}`);
     });
     this.pipelinePushSockets[topic] = push;
@@ -451,8 +476,13 @@ class ClusterNode extends events.EventEmitter {
     const { host } = getSocketSettings(this.socketHash);
     const pullBindAddress = `tcp://${host}:${port}`;
     const pullSocket = nano.socket('pull');
-    pullSocket.bind(pullBindAddress);
-    pullSocket.on('error', function (error) {
+    try {
+      pullSocket.bind(pullBindAddress);
+    } catch (error) {
+      error.message = `Could not bind pipeline pull socket for topic "${topic}" to ${pullBindAddress}: ${error.message}`;
+      throw error;
+    }
+    pullSocket.on('error', (error) => {
       this.emit('error', `Pipeline pull socket for topic "${topic}" at "${pullBindAddress}": ${error.message}`);
     });
     pullSocket.on('data', this.boundReceiveMessage);

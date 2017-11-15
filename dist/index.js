@@ -66,6 +66,7 @@ class ClusterNode extends events.EventEmitter {
                                              
                
                                             
+                                                 
                                 
                      
                                        
@@ -78,6 +79,7 @@ class ClusterNode extends events.EventEmitter {
     this.options = options;
     this.isReady = false;
     this.subscriptions = {};
+    this.localSubscriptions = {};
     this.name = options.name || uuid.v4();
     this.boundReceiveMessage = this.receiveMessage.bind(this);
     const clusterOptions = merge({
@@ -197,6 +199,12 @@ class ClusterNode extends events.EventEmitter {
 
   sendToAll(topic       , message    )      {
     this.pubSocket.send(JSON.stringify([topic, message, this.name]));
+    if (!this.localSubscriptions[topic]) {
+      return;
+    }
+    this.localSubscriptions[topic].forEach((callback) => {
+      callback(message, this.name);
+    });
   }
 
   sendToPipeline(topic       , message    )      {
@@ -207,18 +215,25 @@ class ClusterNode extends events.EventEmitter {
     push.send(JSON.stringify([topic, message, this.name]));
   }
 
-  subscribe(topic       , callback         )      {
+  subscribe(topic       , callback         , includeLocal         )      {
     this.subscriptions[topic] = this.subscriptions[topic] || [];
     this.subscriptions[topic].push(callback);
+    if (includeLocal) {
+      this.localSubscriptions[topic] = this.localSubscriptions[topic] || [];
+      this.localSubscriptions[topic].push(callback);
+    }
   }
 
   unsubscribe(topic       , callback          )      {
     this.subscriptions[topic] = this.subscriptions[topic] || [];
+    this.localSubscriptions[topic] = this.localSubscriptions[topic] || [];
     if (callback) {
       this.subscriptions[topic] = this.subscriptions[topic].filter((cb) => cb !== callback);
+      this.localSubscriptions[topic] = this.localSubscriptions[topic].filter((cb) => cb !== callback);
       return;
     }
     this.subscriptions[topic] = [];
+    this.localSubscriptions[topic] = [];
   }
 
   async close()               {
