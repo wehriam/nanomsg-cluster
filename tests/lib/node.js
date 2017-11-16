@@ -15,7 +15,7 @@ module.exports.getNode = async (name:string, bindAddress:SocketSettings, peerAdd
   await new Promise((resolve) => {
     node.on('ready', resolve);
   });
-  node.on('error', console.error);
+  node.on('error', console.error); // eslint-disable-line no-console
   expect(node.isReady).toEqual(true);
   return node;
 };

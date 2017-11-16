@@ -4,8 +4,10 @@ const uuid = require('uuid');
 const nano = require('nanomsg');
 const events = require('events');
 const { merge } = require('lodash');
+const Discover = require('node-discover');
 
 export type SocketSettings = {
+  name?: string,
   host: string,
   pubsubPort?: number,
   pipelinePort?: number
@@ -45,8 +47,9 @@ const DEFAULT_PIPELINE_PORT = 13002;
 const getSocketHash = (name:string, socketSettings: SocketSettings):string => `${name}/${socketSettings.host}/${socketSettings.pubsubPort || DEFAULT_PUBSUB_PORT}/${socketSettings.pipelinePort || DEFAULT_PIPELINE_PORT}`;
 
 const getSocketSettings = (hash:string):SocketSettings => {
-  const [host, pubsubPort, pipelinePort] = hash.split('/').slice(1);
+  const [name, host, pubsubPort, pipelinePort] = hash.split('/');
   return {
+    name,
     host,
     pubsubPort: parseInt(pubsubPort, 10),
     pipelinePort: parseInt(pipelinePort, 10),
@@ -73,6 +76,7 @@ class ClusterNode extends events.EventEmitter {
   namedPushSockets: {[string]:ConnectSocket};
   closed: boolean;
   clusterUpdateTimeout: number;
+  discovery: Discover;
 
   constructor(options?:Options = {}) {
     super();
@@ -84,7 +88,7 @@ class ClusterNode extends events.EventEmitter {
     this.boundReceiveMessage = this.receiveMessage.bind(this);
     const clusterOptions = merge({
       bindAddress: {
-        host: '127.0.0.1',
+        host: '0.0.0.0',
         pubsubPort: DEFAULT_PUBSUB_PORT,
         pipelinePort: DEFAULT_PIPELINE_PORT,
       },
@@ -156,7 +160,11 @@ class ClusterNode extends events.EventEmitter {
       peerSocketHashes.forEach((socketHash) => {
         const name = socketHash.split('/').shift();
         this.peerSocketHashes[socketHash] = true;
-        this.namedPushSockets[name] = this.addPeer(getSocketSettings(socketHash));
+        const socketSettings = getSocketSettings(socketHash);
+        if (!this.namedPushSockets[name]) {
+          this.emit('addPeer', socketSettings);
+        }
+        this.namedPushSockets[name] = this.addPeer(socketSettings);
       });
     });
     this.subscribe('_clusterRemovePeer', (message:Object) => {
@@ -250,6 +258,7 @@ class ClusterNode extends events.EventEmitter {
     if (this.closed) {
       throw new Error('Already closed.');
     }
+    this.stopDiscovery();
     if (this.clusterUpdateTimeout) {
       clearTimeout(this.clusterUpdateTimeout);
     }
@@ -352,12 +361,12 @@ class ClusterNode extends events.EventEmitter {
           });
         }
       }
+      this.emit('removePeer', Object.assign({}, { name }, peerAddress));
     });
     await Promise.all([
       this.closeSubSocket(pubsubConnectAddress),
       this.closePushSocket(pushConnectAddress),
     ]);
-    this.emit('removePeer', peerAddress);
   }
 
   async closeSubSocket(address:string):Promise<void> {
@@ -506,10 +515,43 @@ class ClusterNode extends events.EventEmitter {
     await this.closePipelinePullSocket(topic);
   }
 
-  getPeers(): Array<SocketSettings & {name: string}> {
-    return Object.keys(this.peerSocketHashes).map((socketHash) => Object.assign({}, {
-      name: socketHash.split('/').shift(),
-    }, getSocketSettings(socketHash)));
+  getPeers(): Array<SocketSettings> {
+    return Object.keys(this.peerSocketHashes).map((socketHash) => getSocketSettings(socketHash));
+  }
+
+  // See node-discover options https://github.com/wankdanker/node-discover#constructor
+  async startDiscovery(options?: Object = {}) {
+    this.stopDiscovery();
+    this.discovery = await new Promise((resolve, reject) => {
+      const d = Discover(options, (error, success) => {
+        if (error) {
+          reject(error);
+        } else if (success) {
+          resolve(d);
+        } else {
+          reject(new Error(`Unknown discovery error with options ${JSON.stringify(options)}`));
+        }
+      });
+    });
+    this.discovery.advertise(getSocketSettings(this.socketHash));
+    this.discovery.on('added', (message:Object) => {
+      if (message.address && message.advertisement && message.advertisement.name && message.advertisement.pubsubPort && message.advertisement.pipelinePort) {
+        const socketSettings = {
+          name: message.advertisement.name,
+          host: message.address,
+          pubsubPort: message.advertisement.pubsubPort,
+          pipelinePort: message.advertisement.pipelinePort,
+        };
+        this.addPeer(socketSettings);
+      }
+    });
+  }
+
+  stopDiscovery() {
+    if (this.discovery) {
+      this.discovery.stop();
+    }
+    this.discovery = null;
   }
 }
 

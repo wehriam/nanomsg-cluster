@@ -160,6 +160,15 @@ node.removePeer({
 });
 ```
 
+Automatic peer discovery with [node-discover](https://github.com/wankdanker/node-discover)
+
+```js
+const options = {}; // See options at https://github.com/wankdanker/node-discover#constructor
+
+// Returns a Promise.
+node.startDiscovery();
+```
+
 Get a list of peers:
 
 ```js
