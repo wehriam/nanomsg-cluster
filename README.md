@@ -167,6 +167,9 @@ const options = {}; // See options at https://github.com/wankdanker/node-discove
 
 // Returns a Promise.
 node.startDiscovery(options);
+
+// later
+node.stopDiscovery();
 ```
 
 Get a list of peers:
