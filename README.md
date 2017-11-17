@@ -166,7 +166,7 @@ Automatic peer discovery with [node-discover](https://github.com/wankdanker/node
 const options = {}; // See options at https://github.com/wankdanker/node-discover#constructor
 
 // Returns a Promise.
-node.startDiscovery();
+node.startDiscovery(options);
 ```
 
 Get a list of peers:
