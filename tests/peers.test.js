@@ -3,6 +3,7 @@
 const { messageTimeout, getNode } = require('./lib/node');
 
 const uuid = require('uuid');
+const expect = require('expect');
 
 const HOST = '127.0.0.1';
 let port = 7000;
@@ -99,6 +100,26 @@ test('nodeC starts gracefuly.', async () => {
   await nodeBAddPeerCPromise;
   await nodeCAddPeerAPromise;
   await nodeCAddPeerBPromise;
+});
+
+test('Nodes choose a leader.', async () => {
+  const peers = [nameA, nameB, nameC];
+  peers.sort();
+  if (nodeA.isLeader()) {
+    expect(peers[0]).toEqual(nameA);
+  } else {
+    expect(peers[0]).not.toEqual(nameA);
+  }
+  if (nodeB.isLeader()) {
+    expect(peers[0]).toEqual(nameB);
+  } else {
+    expect(peers[0]).not.toEqual(nameB);
+  }
+  if (nodeC.isLeader()) {
+    expect(peers[0]).toEqual(nameC);
+  } else {
+    expect(peers[0]).not.toEqual(nameC);
+  }
 });
 
 test('nodeA closes gracefuly.', async () => {

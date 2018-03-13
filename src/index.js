@@ -75,7 +75,7 @@ class ClusterNode extends events.EventEmitter {
   peerSocketHashes: {[string]:boolean};
   namedPushSockets: {[string]:ConnectSocket};
   closed: boolean;
-  clusterUpdateTimeout: number;
+  clusterUpdateTimeout: TimeoutID;
   discovery: Discover;
 
   constructor(options?:Options = {}) {
@@ -133,12 +133,12 @@ class ClusterNode extends events.EventEmitter {
     }
     // Nanomsg sub sockets for incoming messages from all nodes
     // http://nanomsg.org/v1.0.0/nn_pubsub.7.html
-    // Socket object is keyed to the connection string, 
+    // Socket object is keyed to the connection string,
     // i.e.: this.subSockets['tcp://127.0.0.1:DEFAULT_PUBSUB_PORT'] = nano.socket('sub')
     this.subSockets = {};
     // Nanomsg push sockets for outgoing direct messages
     // http://nanomsg.org/v1.0.0/nn_pipeline.7.html
-    // Socket object is keyed to the connection string, 
+    // Socket object is keyed to the connection string,
     // i.e.: this.subSockets['tcp://127.0.0.1:DEFAULT_PIPELINE_PORT'] = nano.socket('push')
     this.pushSockets = {};
     // Socket object is keyed to the server name,
@@ -146,7 +146,7 @@ class ClusterNode extends events.EventEmitter {
     this.namedPushSockets = {};
     // Nanomsg push and pull sockets for pipeline topics
     // http://nanomsg.org/v1.0.0/nn_pipeline.7.html
-    // Socket object is keyed to the topic 
+    // Socket object is keyed to the topic
     // i.e.: this.pipelinePushSockets['topic'] = nano.socket('push')
     // i.e.: this.namedPipelinePushSockets['topic' + name] = this.pipelinePushSockets['topic']
     // i.e.: this.pipelinePullSockets['topic'] = nano.socket('pull')
@@ -517,6 +517,13 @@ class ClusterNode extends events.EventEmitter {
 
   getPeers(): Array<SocketSettings> {
     return Object.keys(this.peerSocketHashes).map((socketHash) => getSocketSettings(socketHash));
+  }
+
+  isLeader(): boolean {
+    const peers = this.getPeers().map((settings) => settings.name);
+    peers.push(this.name);
+    peers.sort();
+    return peers[0] === this.name;
   }
 
   // See node-discover options https://github.com/wankdanker/node-discover#constructor
