@@ -22,6 +22,9 @@ const NANOMSG_TOPIC_PORT_B = port++;
 const NANOMSG_TOPIC_PORT_C = port++;
 const NANOMSG_TOPIC_PORT_D = port++;
 const NANOMSG_TOPIC_PORT_E = port++;
+const NANOMSG_TOPIC_LEADER_PORT_A = port++;
+const NANOMSG_TOPIC_LEADER_PORT_B = port++;
+const NANOMSG_TOPIC_LEADER_PORT_C = port++;
 
 const addressA = {
   host: HOST,
@@ -71,6 +74,7 @@ const topic1 = uuid.v4();
 const topic2 = uuid.v4();
 const topic3 = uuid.v4();
 const topic4 = uuid.v4();
+const topicLeader = uuid.v4();
 const message1 = { [uuid.v4()]: uuid.v4() };
 const message2 = { [uuid.v4()]: uuid.v4() };
 const message3 = { [uuid.v4()]: uuid.v4() };
@@ -206,6 +210,45 @@ test('nodeE sends a message on topic4', async () => {
   expect(callback4).toHaveBeenCalledTimes(1);
   expect(callback4).toHaveBeenCalledWith(message5, nameE);
 });
+
+
+test('Pipeline nodes choose a leader', async () => {
+  const leaderCallback1 = jest.fn();
+  const leaderCallback2 = jest.fn();
+  const leaderCallback3 = jest.fn();
+  nodeA.subscribe(topicLeader, leaderCallback1);
+  nodeB.subscribe(topicLeader, leaderCallback2);
+  nodeC.subscribe(topicLeader, leaderCallback3);
+  nodeA.providePipeline(topicLeader);
+  nodeB.providePipeline(topicLeader);
+  nodeC.providePipeline(topicLeader);
+
+  await messageTimeout();
+  nodeA.consumePipeline(NANOMSG_TOPIC_LEADER_PORT_A, topicLeader);
+  nodeB.consumePipeline(NANOMSG_TOPIC_LEADER_PORT_B, topicLeader);
+  nodeC.consumePipeline(NANOMSG_TOPIC_LEADER_PORT_C, topicLeader);
+
+  await messageTimeout();
+
+  const peers = [nameA, nameB, nameC];
+  peers.sort();
+  if (nodeA.isPipelineLeader(topicLeader)) {
+    expect(peers[0]).toEqual(nameA);
+  } else {
+    expect(peers[0]).not.toEqual(nameA);
+  }
+  if (nodeB.isPipelineLeader(topicLeader)) {
+    expect(peers[0]).toEqual(nameB);
+  } else {
+    expect(peers[0]).not.toEqual(nameB);
+  }
+  if (nodeC.isPipelineLeader(topicLeader)) {
+    expect(peers[0]).toEqual(nameC);
+  } else {
+    expect(peers[0]).not.toEqual(nameC);
+  }
+});
+
 
 test('nodeA closes gracefuly.', async () => {
   const nodeBRemovePeerPromise = new Promise((resolve) => {

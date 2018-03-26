@@ -115,6 +115,12 @@ node.providePipeline(topic);
 
 const message = {foo: "bar"};
 node.sendToPipeline(topic, message);
+
+// Check if node is leader of this pipeline 
+// (must be a provider and a consumer)
+
+node.isPipelineLeader(topic) // true or false
+
 ```
 
 Subscribe to a pipeline:

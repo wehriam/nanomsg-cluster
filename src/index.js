@@ -461,6 +461,12 @@ class ClusterNode extends events.EventEmitter {
     this.namedPipelinePushSockets[name][topic] = address;
   }
 
+  isPipelineLeader(topic:string): boolean {
+    const peers = Object.keys(this.namedPipelinePushSockets).filter((name) => !!this.namedPipelinePushSockets[name][topic]);
+    peers.sort();
+    return peers[0] === this.name;
+  }
+
   providePipeline(topic: string) {
     if (this.pipelinePushSockets[topic]) {
       return;
