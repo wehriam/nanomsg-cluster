@@ -1,4 +1,4 @@
-//      
+// @flow
 
 const uuid = require('uuid');
 const nano = require('nanomsg');
@@ -6,47 +6,47 @@ const events = require('events');
 const { merge } = require('lodash');
 const Discover = require('node-discover');
 
-                              
-                
-               
-                      
-                       
-  
+export type SocketSettings = {
+  name?: string,
+  host: string,
+  pubsubPort?: number,
+  pipelinePort?: number
+};
 
-                   
-               
-                 
-                 
-                  
-                            
-                           
-                    
-  
+type BindSocket = {
+  on: Function,
+  bind: Function,
+  send: Function,
+  close: Function,
+  bound: {[string]: number},
+  removeListener: Function,
+  shutdown: Function
+};
 
-                      
-               
-                    
-                  
-                 
-                                
-                           
-                    
-  
+type ConnectSocket = {
+  on: Function,
+  connect: Function,
+  close: Function,
+  send: Function,
+  connected: {[string]: number},
+  removeListener: Function,
+  shutdown: Function
+};
 
-                
-             
-                                 
-                                          
-    
-               
-  
+type Options = {
+  cluster?: {
+    bindAddress?: SocketSettings,
+    peerAddresses?: Array<SocketSettings>,
+  },
+  name?: string
+};
 
 const DEFAULT_PUBSUB_PORT = 13001;
 const DEFAULT_PIPELINE_PORT = 13002;
 
-const getSocketHash = (name       , socketSettings                )        => `${name}/${socketSettings.host}/${socketSettings.pubsubPort || DEFAULT_PUBSUB_PORT}/${socketSettings.pipelinePort || DEFAULT_PIPELINE_PORT}`;
+const getSocketHash = (name:string, socketSettings: SocketSettings):string => `${name}/${socketSettings.host}/${socketSettings.pubsubPort || DEFAULT_PUBSUB_PORT}/${socketSettings.pipelinePort || DEFAULT_PIPELINE_PORT}`;
 
-const getSocketSettings = (hash       )                => {
+const getSocketSettings = (hash:string):SocketSettings => {
   const [name, host, pubsubPort, pipelinePort] = hash.split('/');
   return {
     name,
@@ -57,28 +57,28 @@ const getSocketSettings = (hash       )                => {
 };
 
 class ClusterNode extends events.EventEmitter {
-                   
-                   
-                         
-                                        
-                        
-                                       
-                                                
-                                                     
-                                             
-                                             
-               
-                                            
-                                                 
-                                
-                     
-                                       
-                                             
-                  
-                                  
-                      
+  isReady: boolean;
+  options: Options;
+  pullSocket: BindSocket;
+  pushSockets: {[string]:ConnectSocket};
+  pubSocket: BindSocket;
+  subSockets: {[string]:ConnectSocket};
+  pipelinePushSockets: {[string]:ConnectSocket};
+  namedPipelinePushSockets: {[string]:ConnectSocket};
+  pipelinePullSockets: {[string]:BindSocket};
+  pipelinePullBindAddress: {[string]:string};
+  name: string;
+  subscriptions: {[string]:Array<Function>};
+  localSubscriptions: {[string]:Array<Function>};
+  boundReceiveMessage: Function;
+  socketHash: string;
+  peerSocketHashes: {[string]:boolean};
+  namedPushSockets: {[string]:ConnectSocket};
+  closed: boolean;
+  clusterUpdateTimeout: TimeoutID;
+  discovery: Discover;
 
-  constructor(options          = {}) {
+  constructor(options?:Options = {}) {
     super();
     this.options = options;
     this.isReady = false;
@@ -155,7 +155,7 @@ class ClusterNode extends events.EventEmitter {
     this.pipelinePullSockets = {};
     this.pipelinePullBindAddress = {};
     // Messaging about peers
-    this.subscribe('_clusterAddPeers', (message       ) => {
+    this.subscribe('_clusterAddPeers', (message:Object) => {
       const peerSocketHashes = [message.socketHash].concat(message.peerSocketHashes.filter((peerSocketHash) => this.socketHash !== peerSocketHash));
       peerSocketHashes.forEach((socketHash) => {
         const name = socketHash.split('/').shift();
@@ -167,18 +167,18 @@ class ClusterNode extends events.EventEmitter {
         this.namedPushSockets[name] = this.addPeer(socketSettings);
       });
     });
-    this.subscribe('_clusterRemovePeer', (message       ) => {
+    this.subscribe('_clusterRemovePeer', (message:Object) => {
       this.removePeer(getSocketSettings(message.socketHash));
     });
-    this.subscribe('_clusterAddPipelineConsumer', (message       , name       ) => {
+    this.subscribe('_clusterAddPipelineConsumer', (message:Object, name:string) => {
       const { topic, pushConnectAddress } = message;
       this.connectPipelineConsumer(topic, pushConnectAddress, name);
     });
-    this.subscribe('_clusterRemovePipelineConsumer', (message       , name       ) => {
+    this.subscribe('_clusterRemovePipelineConsumer', (message:Object, name:string) => {
       const { topic } = message;
       this.disconnectPipelineConsumer(topic, name);
     });
-    this.subscribe('_clusterAddPipelineProvider', (message       ) => {
+    this.subscribe('_clusterAddPipelineProvider', (message:Object) => {
       const { topic } = message;
       const pushConnectAddress = this.pipelinePullBindAddress[topic];
       if (pushConnectAddress) {
@@ -196,7 +196,7 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  receiveMessage(buffer       )      {
+  receiveMessage(buffer:Buffer):void {
     const [topic, message, name] = JSON.parse(String(buffer));
     if (!this.subscriptions[topic]) {
       return;
@@ -206,7 +206,7 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  sendToPeer(name       , topic       , message    )      {
+  sendToPeer(name:string, topic:string, message:any):void {
     const push = this.namedPushSockets[name];
     if (!push) {
       this.emit('error', `${this.name} is unable to send message "${topic}":"${JSON.stringify(message)}" to "${name}"`);
@@ -215,7 +215,7 @@ class ClusterNode extends events.EventEmitter {
     push.send(JSON.stringify([topic, message, this.name]));
   }
 
-  sendToAll(topic       , message    )      {
+  sendToAll(topic:string, message:any):void {
     this.pubSocket.send(JSON.stringify([topic, message, this.name]));
     if (!this.localSubscriptions[topic]) {
       return;
@@ -225,7 +225,7 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  sendToPipeline(topic       , message    )      {
+  sendToPipeline(topic:string, message:any):void {
     const push = this.pipelinePushSockets[topic];
     if (!push) {
       throw new Error(`Not providing pipeline "${topic}"`);
@@ -233,7 +233,7 @@ class ClusterNode extends events.EventEmitter {
     push.send(JSON.stringify([topic, message, this.name]));
   }
 
-  subscribe(topic       , callback         , includeLocal         )      {
+  subscribe(topic:string, callback:Function, includeLocal?:boolean):void {
     this.subscriptions[topic] = this.subscriptions[topic] || [];
     this.subscriptions[topic].push(callback);
     if (includeLocal) {
@@ -242,7 +242,7 @@ class ClusterNode extends events.EventEmitter {
     }
   }
 
-  unsubscribe(topic       , callback          )      {
+  unsubscribe(topic:string, callback?:Function):void {
     this.subscriptions[topic] = this.subscriptions[topic] || [];
     this.localSubscriptions[topic] = this.localSubscriptions[topic] || [];
     if (callback) {
@@ -254,7 +254,7 @@ class ClusterNode extends events.EventEmitter {
     this.localSubscriptions[topic] = [];
   }
 
-  async close()               {
+  async close():Promise<void> {
     if (this.closed) {
       throw new Error('Already closed.');
     }
@@ -283,7 +283,7 @@ class ClusterNode extends events.EventEmitter {
     this.emit('close');
   }
 
-  addPeer(peerAddress                )               {
+  addPeer(peerAddress: SocketSettings):ConnectSocket {
     const pubsubConnectAddress = `tcp://${peerAddress.host}:${peerAddress.pubsubPort || DEFAULT_PUBSUB_PORT}`;
     const pushConnectAddress = `tcp://${peerAddress.host}:${peerAddress.pipelinePort || DEFAULT_PIPELINE_PORT}`;
     const newPeer = !this.subSockets[pubsubConnectAddress] || !this.pushSockets[pushConnectAddress];
@@ -340,14 +340,14 @@ class ClusterNode extends events.EventEmitter {
     return this.pushSockets[pushConnectAddress];
   }
 
-  async removePeer(peerAddress               )               {
+  async removePeer(peerAddress:SocketSettings):Promise<void> {
     const pubsubConnectAddress = `tcp://${peerAddress.host}:${peerAddress.pubsubPort || DEFAULT_PUBSUB_PORT}`;
     const pushConnectAddress = `tcp://${peerAddress.host}:${peerAddress.pipelinePort || DEFAULT_PIPELINE_PORT}`;
     const peerExists = this.subSockets[pubsubConnectAddress] || this.pushSockets[pushConnectAddress];
     if (!peerExists) {
       return;
     }
-    Object.keys(this.namedPushSockets).forEach((name       ) => {
+    Object.keys(this.namedPushSockets).forEach((name:string) => {
       if (this.namedPushSockets[name] === this.pushSockets[pushConnectAddress]) {
         delete this.namedPushSockets[name];
         const socketHash = getSocketHash(name, peerAddress);
@@ -356,7 +356,7 @@ class ClusterNode extends events.EventEmitter {
           socketHash,
         });
         if (this.namedPipelinePushSockets[name]) {
-          Object.keys(this.namedPipelinePushSockets[name]).forEach((topic       ) => {
+          Object.keys(this.namedPipelinePushSockets[name]).forEach((topic:string) => {
             this.disconnectPipelineConsumer(topic, name);
           });
         }
@@ -369,7 +369,7 @@ class ClusterNode extends events.EventEmitter {
     ]);
   }
 
-  async closeSubSocket(address       )               {
+  async closeSubSocket(address:string):Promise<void> {
     const sub = this.subSockets[address];
     delete this.subSockets[address];
     sub.removeListener('data', this.boundReceiveMessage);
@@ -380,7 +380,7 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  async closePushSocket(address       )               {
+  async closePushSocket(address:string):Promise<void> {
     const push = this.pushSockets[address];
     delete this.pushSockets[address];
     await new Promise((resolve, reject) => {
@@ -390,7 +390,7 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  shutdownPipelinePushAddress(topic       , address       )      {
+  shutdownPipelinePushAddress(topic:string, address:string):void {
     const push = this.pipelinePushSockets[topic];
     if (!push) {
       return;
@@ -404,7 +404,7 @@ class ClusterNode extends events.EventEmitter {
     }
   }
 
-  async closePipelinePushSocket(topic       )               {
+  async closePipelinePushSocket(topic:string):Promise<void> {
     const push = this.pipelinePushSockets[topic];
     delete this.pipelinePushSockets[topic];
     await new Promise((resolve, reject) => {
@@ -414,7 +414,7 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  async closePipelinePullSocket(topic       )               {
+  async closePipelinePullSocket(topic:string):Promise<void> {
     const pullSocket = this.pipelinePullSockets[topic];
     delete this.pipelinePullSockets[topic];
     delete this.pipelinePullBindAddress[topic];
@@ -428,7 +428,7 @@ class ClusterNode extends events.EventEmitter {
     });
   }
 
-  disconnectPipelineConsumer(topic        , name        )       {
+  disconnectPipelineConsumer(topic: string, name: string): void {
     if (!this.namedPipelinePushSockets[name]) {
       return;
     }
@@ -440,7 +440,7 @@ class ClusterNode extends events.EventEmitter {
     this.shutdownPipelinePushAddress(topic, address);
   }
 
-  connectPipelineConsumer(topic        , address        , name        )      {
+  connectPipelineConsumer(topic: string, address: string, name: string):void {
     if (!this.pipelinePushSockets[topic]) {
       return;
     }
@@ -461,13 +461,13 @@ class ClusterNode extends events.EventEmitter {
     this.namedPipelinePushSockets[name][topic] = address;
   }
 
-  isPipelineLeader(topic       )          {
+  isPipelineLeader(topic:string): boolean {
     const peers = Object.keys(this.namedPipelinePushSockets).filter((name) => !!this.namedPipelinePushSockets[name][topic]);
     peers.sort();
     return peers[0] === this.name;
   }
 
-  providePipeline(topic        ) {
+  providePipeline(topic: string) {
     if (this.pipelinePushSockets[topic]) {
       return;
     }
@@ -484,7 +484,7 @@ class ClusterNode extends events.EventEmitter {
     }
   }
 
-  consumePipeline(port        , topic        ) {
+  consumePipeline(port: number, topic: string) {
     if (this.pipelinePullSockets[topic]) {
       return;
     }
@@ -515,17 +515,17 @@ class ClusterNode extends events.EventEmitter {
     }
   }
 
-  async stopConsumingPipeline(topic        ) {
+  async stopConsumingPipeline(topic: string) {
     this.sendToAll('_clusterRemovePipelineConsumer', { topic });
     await new Promise((resolve) => setTimeout(resolve, 100));
     await this.closePipelinePullSocket(topic);
   }
 
-  getPeers()                        {
+  getPeers(): Array<SocketSettings> {
     return Object.keys(this.peerSocketHashes).map((socketHash) => getSocketSettings(socketHash));
   }
 
-  isLeader()          {
+  isLeader(): boolean {
     const peers = this.getPeers().map((settings) => settings.name);
     peers.push(this.name);
     peers.sort();
@@ -533,7 +533,7 @@ class ClusterNode extends events.EventEmitter {
   }
 
   // See node-discover options https://github.com/wankdanker/node-discover#constructor
-  async startDiscovery(options          = {}) {
+  async startDiscovery(options?: Object = {}) {
     this.stopDiscovery();
     this.discovery = await new Promise((resolve, reject) => {
       const d = Discover(options, (error, success) => {
@@ -547,7 +547,7 @@ class ClusterNode extends events.EventEmitter {
       });
     });
     this.discovery.advertise(getSocketSettings(this.socketHash));
-    this.discovery.on('added', (message       ) => {
+    this.discovery.on('added', (message:Object) => {
       if (message.address && message.advertisement && message.advertisement.name && message.advertisement.pubsubPort && message.advertisement.pipelinePort) {
         const socketSettings = {
           name: message.advertisement.name,

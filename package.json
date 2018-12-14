@@ -1,26 +1,32 @@
 {
   "name": "nanomsg-cluster",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Nanomsg based clustering",
   "main": "dist/index.js",
   "scripts": {
-    "build": "rm -rf ./dist; flow-remove-types ./src --out-dir ./dist;",
-    "flow-typed": "flow-typed install --overwrite",
+    "build": "rm -rf ./dist; flow-remove-types ./src --out-dir ./dist && flow-copy-source ./src ./dist",
+    "flow-typed": "./node_modules/.bin/flow-typed install --overwrite",
     "test": "yarn lint && yarn test:js",
     "test:js": "cross-env NODE_ENV=test jest --runInBand tests",
     "lint": "npm run lint:js && npm run lint:flow",
     "lint:js": "eslint -c ./.eslintrc --no-eslintrc --fix .",
     "lint:flow": "flow --show-all-errors",
-    "lint:staged": "lint-staged"
+    "coverage": "codecov",
+    "start-pre-commit": "git stash -q --keep-index",
+    "end-pre-commit": "git add -u && git stash pop -q"
   },
+  "pre-commit": [
+    "lint",
+    "start-pre-commit",
+    "build",
+    "end-pre-commit"
+  ],
   "jest": {
-    "verbose": true,
-    "resetModules": true,
+    "coverageDirectory": "./coverage/",
     "collectCoverage": true,
     "collectCoverageFrom": [
-      "src/**/*.js"
+      "src/*.js"
     ],
-    "resolver": "jest-directory-named-resolver",
     "transform": {
       "^.+\\.js(?:\\.flow)?$": "jest-flow-transform"
     }
@@ -36,38 +42,34 @@
       "eslint -c .eslintrc --ignore-path .eslintignore"
     ]
   },
-  "pre-commit": [
-    "lint:staged",
-    "build"
-  ],
   "dependencies": {
-    "lodash": "^4.17.5",
+    "lodash": "^4.17.11",
     "nanomsg": "^4.0.2",
-    "node-discover": "^0.6.2",
-    "uuid": "^3.2.1"
+    "node-discover": "^1.0.0",
+    "uuid": "^3.3.2"
   },
   "devDependencies": {
-    "babel-eslint": "^8.2.2",
-    "cross-env": "^5.1.4",
-    "eslint": "^4.19.1",
+    "babel-eslint": "^8.2.3",
+    "codecov": "^3.1.0",
+    "cross-env": "^5.2.0",
+    "eslint": "^5.10.0",
     "eslint-config-bunchtogether": "^1.1.6",
-    "eslint-import-resolver-webpack": "^0.8.4",
-    "eslint-plugin-flowtype": "^2.46.1",
-    "eslint-plugin-flowtype-errors": "^3.5.1",
-    "eslint-plugin-import": "^2.9.0",
-    "eslint-plugin-jest": "^21.15.0",
-    "eslint-plugin-jsx-a11y": "^6.0.3",
-    "eslint-plugin-react": "^7.7.0",
-    "expect": "^22.4.3",
-    "flow-bin": "^0.68.0",
+    "eslint-plugin-flowtype": "^3.2.0",
+    "eslint-plugin-flowtype-errors": "^3.6.0",
+    "eslint-plugin-import": "^2.14.0",
+    "eslint-plugin-jest": "^22.1.2",
+    "eslint-plugin-jsx-a11y": "^6.1.2",
+    "eslint-plugin-react": "^7.11.1",
+    "expect": "^23.6.0",
+    "flow-bin": "^0.89.0",
+    "flow-copy-source": "^2.0.2",
     "flow-remove-types": "^1.2.3",
-    "flow-typed": "^2.4.0",
+    "flow-typed": "^2.5.1",
     "ip": "^1.1.5",
-    "jest": "^22.4.3",
-    "jest-directory-named-resolver": "jsonnull/jest-directory-named-resolver",
+    "jest": "^23.6.0",
     "jest-flow-transform": "^1.0.1",
-    "lint-staged": "^7.0.0",
-    "pre-commit": "^1.2.2"
+    "pre-commit": "^1.2.2",
+    "uuid": "^3.3.2"
   },
   "bugs": {
     "url": "https://github.com/wehriam/nanomsg-cluster/issues"
