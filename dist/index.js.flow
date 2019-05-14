@@ -168,7 +168,10 @@ class ClusterNode extends events.EventEmitter {
       });
     });
     this.subscribe('_clusterRemovePeer', (message:Object) => {
-      this.removePeer(getSocketSettings(message.socketHash));
+      this.removePeer(message.peerAddress, false);
+    });
+    this.subscribe('_clusterRemoveHost', (message:Object) => {
+      this.removeHost(message.host, false);
     });
     this.subscribe('_clusterAddPipelineConsumer', (message:Object, name:string) => {
       const { topic, pushConnectAddress } = message;
@@ -263,7 +266,7 @@ class ClusterNode extends events.EventEmitter {
       clearTimeout(this.clusterUpdateTimeout);
     }
     this.sendToAll('_clusterRemovePeer', {
-      socketHash: this.socketHash,
+      peerAddress: getSocketSettings(this.socketHash),
     });
     await new Promise((resolve) => setTimeout(resolve, 100));
     await Promise.all(Object.keys(this.pipelinePushSockets).map(this.closePipelinePushSocket.bind(this)));
@@ -340,7 +343,42 @@ class ClusterNode extends events.EventEmitter {
     return this.pushSockets[pushConnectAddress];
   }
 
-  async removePeer(peerAddress:SocketSettings):Promise<void> {
+  async removeHost(host:string, sendToAll?: boolean = true):Promise<void> {
+    if (sendToAll) {
+      this.sendToAll('_clusterRemoveHost', {
+        host,
+      });
+    }
+    const socketSettings = getSocketSettings(this.socketHash);
+    // This peer's host is being removed
+    if (socketSettings.host === host) {
+      for (const peerAddress of this.getPeers()) {
+        if (peerAddress.host === host) {
+          continue;
+        }
+        await this._removePeer(peerAddress); // eslint-disable-line no-underscore-dangle
+      }
+      return;
+    }
+    // A different host is being removed
+    for (const peerAddress of this.getPeers()) {
+      if (peerAddress.host !== host) {
+        continue;
+      }
+      await this._removePeer(peerAddress); // eslint-disable-line no-underscore-dangle
+    }
+  }
+
+  async removePeer(peerAddress:SocketSettings, sendToAll?: boolean = true):Promise<void> {
+    if (sendToAll) {
+      this.sendToAll('_clusterRemovePeer', {
+        peerAddress,
+      });
+    }
+    await this._removePeer(peerAddress); // eslint-disable-line no-underscore-dangle
+  }
+
+  async _removePeer(peerAddress:SocketSettings):Promise<void> {
     const pubsubConnectAddress = `tcp://${peerAddress.host}:${peerAddress.pubsubPort || DEFAULT_PUBSUB_PORT}`;
     const pushConnectAddress = `tcp://${peerAddress.host}:${peerAddress.pipelinePort || DEFAULT_PIPELINE_PORT}`;
     const peerExists = this.subSockets[pubsubConnectAddress] || this.pushSockets[pushConnectAddress];
@@ -352,9 +390,6 @@ class ClusterNode extends events.EventEmitter {
         delete this.namedPushSockets[name];
         const socketHash = getSocketHash(name, peerAddress);
         delete this.peerSocketHashes[socketHash];
-        this.sendToAll('_clusterRemovePeer', {
-          socketHash,
-        });
         if (this.namedPipelinePushSockets[name]) {
           Object.keys(this.namedPipelinePushSockets[name]).forEach((topic:string) => {
             this.disconnectPipelineConsumer(topic, name);
