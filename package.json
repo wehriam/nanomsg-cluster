@@ -1,6 +1,6 @@
 {
   "name": "nanomsg-cluster",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Nanomsg based clustering",
   "main": "dist/index.js",
   "scripts": {
@@ -13,7 +13,8 @@
     "lint:flow": "flow --show-all-errors",
     "coverage": "codecov",
     "start-pre-commit": "git stash -q --keep-index",
-    "end-pre-commit": "git add -u && git stash pop -q"
+    "end-pre-commit": "git add -u && git stash pop -q",
+    "capacity": "flow-node scripts/capacity.js"
   },
   "pre-commit": [
     "lint",
@@ -43,6 +44,7 @@
     ]
   },
   "dependencies": {
+    "@msgpack/msgpack": "^1.12.0",
     "lodash": "^4.17.15",
     "nanomsg": "^4.1.0",
     "node-discover": "^1.1.2",

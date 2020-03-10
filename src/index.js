@@ -5,6 +5,7 @@ const nano = require('nanomsg');
 const events = require('events');
 const { merge } = require('lodash');
 const Discover = require('node-discover');
+const { encode, decode } = require('@msgpack/msgpack');
 
 export type SocketSettings = {
   name?: string,
@@ -101,7 +102,7 @@ class ClusterNode extends events.EventEmitter {
     // Bind a nanomsg pull socket for incoming direct messages
     // http://nanomsg.org/v1.0.0/nn_pipeline.7.html
     const pullBindAddress = `tcp://${clusterOptions.bindAddress.host}:${clusterOptions.bindAddress.pipelinePort}`;
-    this.pullSocket = nano.socket('pull', { rcvbuf: 4194304 });
+    this.pullSocket = nano.socket('pull', { rcvbuf: 4194304, rcvmaxsize: 4194304 });
     try {
       this.pullSocket.bind(pullBindAddress);
     } catch (error) {
@@ -200,7 +201,7 @@ class ClusterNode extends events.EventEmitter {
   }
 
   receiveMessage(buffer:Buffer):void {
-    const [topic, message, name] = JSON.parse(String(buffer));
+    const [topic, message, name] = decode(buffer);
     if (!this.subscriptions[topic]) {
       return;
     }
@@ -215,11 +216,11 @@ class ClusterNode extends events.EventEmitter {
       this.emit('error', `${this.name} is unable to send message "${topic}":"${JSON.stringify(message)}" to "${name}"`);
       return;
     }
-    push.send(JSON.stringify([topic, message, this.name]));
+    push.send(encode([topic, message, this.name]));
   }
 
   sendToAll(topic:string, message:any):void {
-    this.pubSocket.send(JSON.stringify([topic, message, this.name]));
+    this.pubSocket.send(encode([topic, message, this.name]));
     if (!this.localSubscriptions[topic]) {
       return;
     }
@@ -233,7 +234,7 @@ class ClusterNode extends events.EventEmitter {
     if (!push) {
       throw new Error(`Not providing pipeline "${topic}"`);
     }
-    push.send(JSON.stringify([topic, message, this.name]));
+    push.send(encode([topic, message, this.name]));
   }
 
   subscribe(topic:string, callback:Function, includeLocal?:boolean):void {
@@ -294,7 +295,7 @@ class ClusterNode extends events.EventEmitter {
       return this.pushSockets[pushConnectAddress];
     }
     if (!this.subSockets[pubsubConnectAddress]) {
-      const sub = nano.socket('sub', { rcvbuf: 4194304 });
+      const sub = nano.socket('sub', { rcvbuf: 4194304, rcvmaxsize: 4194304 });
       sub.on('error', (error) => {
         this.emit('error', `Sub socket "${pubsubConnectAddress}": ${error.message}`);
       });
@@ -311,7 +312,7 @@ class ClusterNode extends events.EventEmitter {
       sub.on('data', this.boundReceiveMessage);
     }
     if (!this.pushSockets[pushConnectAddress]) {
-      const push = nano.socket('push', { sndbuf: 4194304 });
+      const push = nano.socket('push', { sndbuf: 4194304, dontwait: true });
       push.on('error', (error) => {
         this.emit('error', `Push socket "${pushConnectAddress}": ${error.message}`);
       });
@@ -325,7 +326,7 @@ class ClusterNode extends events.EventEmitter {
         throw new Error(`Could not connect push socket to ${pushConnectAddress}`);
       }
       this.pushSockets[pushConnectAddress] = push;
-      push.send(JSON.stringify(['_clusterAddPeers', {
+      push.send(encode(['_clusterAddPeers', {
         socketHash: this.socketHash,
         peerSocketHashes: Object.keys(this.peerSocketHashes),
       }]));
@@ -506,7 +507,7 @@ class ClusterNode extends events.EventEmitter {
     if (this.pipelinePushSockets[topic]) {
       return;
     }
-    const push = nano.socket('push', { sndbuf: 4194304 });
+    const push = nano.socket('push', { sndbuf: 4194304, dontwait: true });
     push.on('error', (error) => {
       this.emit('error', `Pipeline push socket for topic "${topic}": ${error.message}`);
     });
@@ -525,7 +526,7 @@ class ClusterNode extends events.EventEmitter {
     }
     const { host } = getSocketSettings(this.socketHash);
     const pullBindAddress = `tcp://${host}:${port}`;
-    const pullSocket = nano.socket('pull', { rcvbuf: 4194304 });
+    const pullSocket = nano.socket('pull', { rcvbuf: 4194304, rcvmaxsize: 4194304 });
     try {
       pullSocket.bind(pullBindAddress);
     } catch (error) {

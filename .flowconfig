@@ -1,7 +1,6 @@
 [ignore]
 
 .*bower.*
-.*/node_modules/.*
 
 [include]
 
