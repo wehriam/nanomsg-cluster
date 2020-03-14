@@ -78,6 +78,7 @@ class ClusterNode extends events.EventEmitter {
                   
                                          
                       
+                                            
 
   constructor(options          = {}) {
     super();
@@ -87,6 +88,7 @@ class ClusterNode extends events.EventEmitter {
     this.localSubscriptions = {};
     this.name = options.name || uuid.v4();
     this.boundReceiveMessage = this.receiveMessage.bind(this);
+    this.pipelineConsumerCache = {};
     const clusterOptions = merge({
       bindAddress: {
         host: '0.0.0.0',
@@ -469,6 +471,7 @@ class ClusterNode extends events.EventEmitter {
       return;
     }
     const address = this.namedPipelinePushSockets[name][topic];
+    delete this.pipelineConsumerCache[topic];
     delete this.namedPipelinePushSockets[name][topic];
     if (!address) {
       return;
@@ -495,6 +498,18 @@ class ClusterNode extends events.EventEmitter {
     }
     this.namedPipelinePushSockets[name] = this.namedPipelinePushSockets[name] || {};
     this.namedPipelinePushSockets[name][topic] = address;
+  }
+
+  hasPipelineConsumer(topic       )          {
+    if (this.pipelineConsumerCache[topic]) {
+      return true;
+    }
+    const peers = Object.keys(this.namedPipelinePushSockets).filter((name) => !!this.namedPipelinePushSockets[name][topic]);
+    if (peers.length > 0) {
+      this.pipelineConsumerCache[topic] = true;
+      return true;
+    }
+    return false;
   }
 
   isPipelineLeader(topic       )          {

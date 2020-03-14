@@ -94,6 +94,7 @@ test('nodeA, nodeB, and nodeC provide a topic', async () => {
   nodeB.providePipeline(topic2);
   nodeC.providePipeline(topic2);
   await messageTimeout();
+  expect(nodeA.hasPipelineConsumer(topic1)).toEqual(false);
 });
 
 test('nodeB and nodeC consume and subscribe to topic1', async () => {
@@ -102,6 +103,7 @@ test('nodeB and nodeC consume and subscribe to topic1', async () => {
   nodeB.subscribe(topic1, callback1);
   nodeC.subscribe(topic1, callback1);
   await messageTimeout();
+  expect(nodeA.hasPipelineConsumer(topic1)).toEqual(true);
 });
 
 test('nodeA consumes and subscribes to topic2', async () => {
@@ -247,6 +249,13 @@ test('Pipeline nodes choose a leader', async () => {
   } else {
     expect(peers[0]).not.toEqual(nameC);
   }
+});
+
+test('nodeB and nodeC stop consuming topic 1.', async () => {
+  nodeB.stopConsumingPipeline(topic1);
+  nodeC.stopConsumingPipeline(topic1);
+  await messageTimeout();
+  expect(nodeA.hasPipelineConsumer(topic1)).toEqual(false);
 });
 
 
