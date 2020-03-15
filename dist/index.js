@@ -170,6 +170,7 @@ class ClusterNode extends events.EventEmitter {
           this.emit('addPeer', socketSettings);
         }
         this.namedPushSockets[name] = this.addPeer(socketSettings);
+        this.advertisePipelineConsumers();
       });
     });
     this.subscribe('_clusterRemovePeer', (message       ) => {
@@ -490,6 +491,10 @@ class ClusterNode extends events.EventEmitter {
     if (typeof push.connected[address] !== 'undefined') {
       return;
     }
+    if (this.namedPipelinePushSockets[name] && this.namedPipelinePushSockets[name][topic] === address) {
+      // Already connected
+      return;
+    }
     try {
       push.connect(address);
     } catch (error) {
@@ -570,6 +575,16 @@ class ClusterNode extends events.EventEmitter {
     });
     if (this.pipelinePushSockets[topic]) {
       this.connectPipelineConsumer(topic, pullBindAddress, this.name);
+    }
+  }
+
+  advertisePipelineConsumers() {
+    for (const topic of Object.keys(this.pipelinePullBindAddress)) {
+      const pullBindAddress = this.pipelinePullBindAddress[topic];
+      this.sendToAll('_clusterAddPipelineConsumer', {
+        topic,
+        pushConnectAddress: pullBindAddress,
+      });
     }
   }
 

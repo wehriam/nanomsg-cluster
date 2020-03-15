@@ -12,16 +12,19 @@ const NANOMSG_PUBSUB_PORT_B = port++;
 const NANOMSG_PUBSUB_PORT_C = port++;
 const NANOMSG_PUBSUB_PORT_D = port++;
 const NANOMSG_PUBSUB_PORT_E = port++;
+const NANOMSG_PUBSUB_PORT_F = port++;
 const NANOMSG_PIPELINE_PORT_A = port++;
 const NANOMSG_PIPELINE_PORT_B = port++;
 const NANOMSG_PIPELINE_PORT_C = port++;
 const NANOMSG_PIPELINE_PORT_D = port++;
 const NANOMSG_PIPELINE_PORT_E = port++;
+const NANOMSG_PIPELINE_PORT_F = port++;
 const NANOMSG_TOPIC_PORT_A = port++;
 const NANOMSG_TOPIC_PORT_B = port++;
 const NANOMSG_TOPIC_PORT_C = port++;
 const NANOMSG_TOPIC_PORT_D = port++;
 const NANOMSG_TOPIC_PORT_E = port++;
+const NANOMSG_TOPIC_PORT_F = port++;
 const NANOMSG_TOPIC_LEADER_PORT_A = port++;
 const NANOMSG_TOPIC_LEADER_PORT_B = port++;
 const NANOMSG_TOPIC_LEADER_PORT_C = port++;
@@ -56,11 +59,18 @@ const addressE = {
   pipelinePort: NANOMSG_PIPELINE_PORT_E,
 };
 
+const addressF = {
+  host: HOST,
+  pubsubPort: NANOMSG_PUBSUB_PORT_F,
+  pipelinePort: NANOMSG_PIPELINE_PORT_F,
+};
+
 let nodeA;
 let nodeB;
 let nodeC;
 let nodeD;
 let nodeE;
+let nodeF;
 const callback1 = jest.fn();
 const callback2 = jest.fn();
 const callback3 = jest.fn();
@@ -70,6 +80,7 @@ const nameB = uuid.v4();
 const nameC = uuid.v4();
 const nameD = uuid.v4();
 const nameE = uuid.v4();
+const nameF = uuid.v4();
 const topic1 = uuid.v4();
 const topic2 = uuid.v4();
 const topic3 = uuid.v4();
@@ -114,6 +125,29 @@ test('nodeB and nodeC consume and subscribe to topic1', async () => {
   expect(nodeA.hasPipelineConsumer(topic1)).toEqual(true);
   expect(nodeA.pipelineConsumers(topic1)).toEqual(expect.arrayContaining([nodeB.name, nodeC.name]));
   await connectPipelineConsumerPromise;
+});
+
+test('nodeF advertises consumers after connecting to nodeA', async () => {
+  const connectPipelineConsumerPromise = new Promise((resolve) => {
+    nodeA.on('connectPipelineConsumer', (topic, name) => {
+      if (topic === topic1 && name === nodeF.name) {
+        resolve();
+      }
+    });
+  });
+  nodeF = await getNode(nameF, addressF, []);
+  nodeF.consumePipeline(NANOMSG_TOPIC_PORT_F, topic1);
+  nodeF.addPeer(addressA);
+  await connectPipelineConsumerPromise;
+  const disconnectPipelineConsumerPromise = new Promise((resolve) => {
+    nodeA.on('disconnectPipelineConsumer', (topic, name) => {
+      if (topic === topic1 && name === nodeF.name) {
+        resolve();
+      }
+    });
+  });
+  await nodeF.close();
+  await disconnectPipelineConsumerPromise;
 });
 
 test('nodeA consumes and subscribes to topic2', async () => {
