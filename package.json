@@ -1,6 +1,6 @@
 {
   "name": "nanomsg-cluster",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "description": "Nanomsg based clustering",
   "main": "dist/index.js",
   "scripts": {
