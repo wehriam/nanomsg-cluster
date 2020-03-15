@@ -170,7 +170,6 @@ class ClusterNode extends events.EventEmitter {
           this.emit('addPeer', socketSettings);
         }
         this.namedPushSockets[name] = this.addPeer(socketSettings);
-        this.advertisePipelineConsumers();
       });
     });
     this.subscribe('_clusterRemovePeer', (message:Object) => {
@@ -296,6 +295,9 @@ class ClusterNode extends events.EventEmitter {
     const pubsubConnectAddress = `tcp://${peerAddress.host}:${peerAddress.pubsubPort || DEFAULT_PUBSUB_PORT}`;
     const pushConnectAddress = `tcp://${peerAddress.host}:${peerAddress.pipelinePort || DEFAULT_PIPELINE_PORT}`;
     const newPeer = !this.subSockets[pubsubConnectAddress] || !this.pushSockets[pushConnectAddress];
+    setImmediate(() => {
+      this.advertisePipelines();
+    });
     if (!newPeer) {
       return this.pushSockets[pushConnectAddress];
     }
@@ -578,12 +580,10 @@ class ClusterNode extends events.EventEmitter {
     }
   }
 
-  advertisePipelineConsumers() {
-    for (const topic of Object.keys(this.pipelinePullBindAddress)) {
-      const pullBindAddress = this.pipelinePullBindAddress[topic];
-      this.sendToAll('_clusterAddPipelineConsumer', {
+  advertisePipelines() {
+    for (const topic of Object.keys(this.pipelinePushSockets)) {
+      this.sendToAll('_clusterAddPipelineProvider', {
         topic,
-        pushConnectAddress: pullBindAddress,
       });
     }
   }
