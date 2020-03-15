@@ -497,10 +497,10 @@ class ClusterNode extends events.EventEmitter {
     if (push.connected[address] <= -1) {
       throw new Error(`Could not connect topic "${topic}" for push socket to ${address}`);
     }
+    delete this.pipelineConsumerCache[topic];
     this.namedPipelinePushSockets[name] = this.namedPipelinePushSockets[name] || {};
     this.namedPipelinePushSockets[name][topic] = address;
     this.emit('connectPipelineConsumer', topic, name);
-    delete this.pipelineConsumerCache[topic];
   }
 
   hasPipelineConsumer(topic       )         {
