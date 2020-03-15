@@ -95,15 +95,25 @@ test('nodeA, nodeB, and nodeC provide a topic', async () => {
   nodeC.providePipeline(topic2);
   await messageTimeout();
   expect(nodeA.hasPipelineConsumer(topic1)).toEqual(false);
+  expect(nodeA.pipelineConsumers(topic1)).toEqual([]);
 });
 
 test('nodeB and nodeC consume and subscribe to topic1', async () => {
+  const connectPipelineConsumerPromise = new Promise((resolve) => {
+    nodeA.on('connectPipelineConsumer', (topic, name) => {
+      if (topic === topic1 && name === nodeB.name) {
+        resolve();
+      }
+    });
+  });
   nodeB.consumePipeline(NANOMSG_TOPIC_PORT_B, topic1);
   nodeC.consumePipeline(NANOMSG_TOPIC_PORT_C, topic1);
   nodeB.subscribe(topic1, callback1);
   nodeC.subscribe(topic1, callback1);
   await messageTimeout();
   expect(nodeA.hasPipelineConsumer(topic1)).toEqual(true);
+  expect(nodeA.pipelineConsumers(topic1)).toEqual(expect.arrayContaining([nodeB.name, nodeC.name]));
+  await connectPipelineConsumerPromise;
 });
 
 test('nodeA consumes and subscribes to topic2', async () => {
@@ -234,28 +244,42 @@ test('Pipeline nodes choose a leader', async () => {
 
   const peers = [nameA, nameB, nameC];
   peers.sort();
+  let hasLeader = false;
   if (nodeA.isPipelineLeader(topicLeader)) {
     expect(peers[0]).toEqual(nameA);
+    hasLeader = true;
   } else {
     expect(peers[0]).not.toEqual(nameA);
   }
   if (nodeB.isPipelineLeader(topicLeader)) {
     expect(peers[0]).toEqual(nameB);
+    hasLeader = true;
   } else {
     expect(peers[0]).not.toEqual(nameB);
   }
   if (nodeC.isPipelineLeader(topicLeader)) {
     expect(peers[0]).toEqual(nameC);
+    hasLeader = true;
   } else {
     expect(peers[0]).not.toEqual(nameC);
   }
+  expect(hasLeader).toEqual(true);
 });
 
 test('nodeB and nodeC stop consuming topic 1.', async () => {
+  const disconnectPipelineConsumerPromise = new Promise((resolve) => {
+    nodeA.on('disconnectPipelineConsumer', (topic, name) => {
+      if (topic === topic1 && name === nodeB.name) {
+        resolve();
+      }
+    });
+  });
   nodeB.stopConsumingPipeline(topic1);
   nodeC.stopConsumingPipeline(topic1);
   await messageTimeout();
   expect(nodeA.hasPipelineConsumer(topic1)).toEqual(false);
+  expect(nodeA.pipelineConsumers(topic1)).toEqual([]);
+  await disconnectPipelineConsumerPromise;
 });
 
 

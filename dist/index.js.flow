@@ -78,7 +78,7 @@ class ClusterNode extends events.EventEmitter {
   closed: boolean;
   clusterUpdateTimeout: TimeoutID | void;
   discovery: Discover;
-  pipelineConsumerCache: {[string]:boolean};
+  pipelineConsumerCache: {[string]:Array<string>};
 
   constructor(options?:Options = {}) {
     super();
@@ -477,6 +477,7 @@ class ClusterNode extends events.EventEmitter {
       return;
     }
     this.shutdownPipelinePushAddress(topic, address);
+    this.emit('disconnectPipelineConsumer', topic, name);
   }
 
   connectPipelineConsumer(topic: string, address: string, name: string):void {
@@ -498,18 +499,22 @@ class ClusterNode extends events.EventEmitter {
     }
     this.namedPipelinePushSockets[name] = this.namedPipelinePushSockets[name] || {};
     this.namedPipelinePushSockets[name][topic] = address;
+    this.emit('connectPipelineConsumer', topic, name);
+    delete this.pipelineConsumerCache[topic];
   }
 
-  hasPipelineConsumer(topic:string): boolean {
-    if (this.pipelineConsumerCache[topic]) {
-      return true;
+  hasPipelineConsumer(topic:string):boolean {
+    return this.pipelineConsumers(topic).length > 0;
+  }
+
+  pipelineConsumers(topic:string): Array<string> { // eslint-disable-line consistent-return
+    const cachedPipelineConsumers = this.pipelineConsumerCache[topic];
+    if (cachedPipelineConsumers) {
+      return cachedPipelineConsumers;
     }
-    const peers = Object.keys(this.namedPipelinePushSockets).filter((name) => !!this.namedPipelinePushSockets[name][topic]);
-    if (peers.length > 0) {
-      this.pipelineConsumerCache[topic] = true;
-      return true;
-    }
-    return false;
+    const pipelineConsumers = Object.keys(this.namedPipelinePushSockets).filter((name) => !!this.namedPipelinePushSockets[name][topic]);
+    this.pipelineConsumerCache[topic] = pipelineConsumers;
+    return pipelineConsumers;
   }
 
   isPipelineLeader(topic:string): boolean {
