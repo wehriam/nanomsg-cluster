@@ -45,6 +45,8 @@ type Options = {
 const DEFAULT_PUBSUB_PORT = 13001;
 const DEFAULT_PIPELINE_PORT = 13002;
 
+const socketOptions = { sndbuf: 4194304, dontwait: true, rcvbuf: 4194304, rcvmaxsize: 4194304 };
+
 const getSocketHash = (name:string, socketSettings: SocketSettings):string => `${name}/${socketSettings.host}/${socketSettings.pubsubPort || DEFAULT_PUBSUB_PORT}/${socketSettings.pipelinePort || DEFAULT_PIPELINE_PORT}`;
 
 const getSocketSettings = (hash:string):SocketSettings => {
@@ -104,7 +106,7 @@ class ClusterNode extends events.EventEmitter {
     // Bind a nanomsg pull socket for incoming direct messages
     // http://nanomsg.org/v1.0.0/nn_pipeline.7.html
     const pullBindAddress = `tcp://${clusterOptions.bindAddress.host}:${clusterOptions.bindAddress.pipelinePort}`;
-    this.pullSocket = nano.socket('pull', { rcvbuf: 4194304, rcvmaxsize: 4194304 });
+    this.pullSocket = nano.socket('pull', socketOptions);
     try {
       this.pullSocket.bind(pullBindAddress);
     } catch (error) {
@@ -121,7 +123,7 @@ class ClusterNode extends events.EventEmitter {
     // Bind a Nanomsg pub socket for outgoing messages to all nodes
     // http://nanomsg.org/v1.0.0/nn_pubsub.7.html
     const pubsubBindAddress = `tcp://${clusterOptions.bindAddress.host}:${clusterOptions.bindAddress.pubsubPort}`;
-    this.pubSocket = nano.socket('pub', { sndbuf: 4194304 });
+    this.pubSocket = nano.socket('pub', socketOptions);
     try {
       this.pubSocket.bind(pubsubBindAddress);
     } catch (error) {
@@ -297,7 +299,7 @@ class ClusterNode extends events.EventEmitter {
       return this.pushSockets[pushConnectAddress];
     }
     if (!this.subSockets[pubsubConnectAddress]) {
-      const sub = nano.socket('sub', { rcvbuf: 4194304, rcvmaxsize: 4194304 });
+      const sub = nano.socket('sub', socketOptions);
       sub.on('error', (error) => {
         this.emit('error', `Sub socket "${pubsubConnectAddress}": ${error.message}`);
       });
@@ -314,7 +316,7 @@ class ClusterNode extends events.EventEmitter {
       sub.on('data', this.boundReceiveMessage);
     }
     if (!this.pushSockets[pushConnectAddress]) {
-      const push = nano.socket('push', { sndbuf: 4194304, dontwait: true });
+      const push = nano.socket('push', socketOptions);
       push.on('error', (error) => {
         this.emit('error', `Push socket "${pushConnectAddress}": ${error.message}`);
       });
@@ -527,7 +529,7 @@ class ClusterNode extends events.EventEmitter {
     if (this.pipelinePushSockets[topic]) {
       return;
     }
-    const push = nano.socket('push', { sndbuf: 4194304, dontwait: true });
+    const push = nano.socket('push', socketOptions);
     push.on('error', (error) => {
       this.emit('error', `Pipeline push socket for topic "${topic}": ${error.message}`);
     });
@@ -546,7 +548,7 @@ class ClusterNode extends events.EventEmitter {
     }
     const { host } = getSocketSettings(this.socketHash);
     const pullBindAddress = `tcp://${host}:${port}`;
-    const pullSocket = nano.socket('pull', { rcvbuf: 4194304, rcvmaxsize: 4194304 });
+    const pullSocket = nano.socket('pull', socketOptions);
     try {
       pullSocket.bind(pullBindAddress);
     } catch (error) {
