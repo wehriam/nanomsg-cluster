@@ -5,11 +5,12 @@ import type { SocketSettings } from '../../src';
 const expect = require('expect');
 const ClusterNode = require('../../src');
 
-module.exports.getNode = async (name:string, bindAddress:SocketSettings, peerAddresses:Array<SocketSettings>):Promise<ClusterNode> => {
+module.exports.getNode = async (name:string, bindAddress:SocketSettings, peerAddresses:Array<SocketSettings>, heartbeatInterval?: number):Promise<ClusterNode> => {
   const node = new ClusterNode({
     name,
     bindAddress,
     peerAddresses,
+    heartbeatInterval,
   });
   expect(node.isReady).toEqual(false);
   await new Promise((resolve) => {

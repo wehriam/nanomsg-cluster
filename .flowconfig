@@ -1,6 +1,7 @@
 [ignore]
 
 .*bower.*
+.*dist.*.flow
 
 [include]
 
@@ -8,4 +9,3 @@
 
 [options]
 
-suppress_comment=.*\\$FlowNewLine
