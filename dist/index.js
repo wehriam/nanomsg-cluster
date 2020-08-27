@@ -35,11 +35,10 @@ const { encode, decode } = require('@msgpack/msgpack');
   
 
                 
-             
-                                 
-                                          
-    
-               
+                               
+                                        
+                
+                            
   
 
 const DEFAULT_PUBSUB_PORT = 13001;
@@ -60,27 +59,29 @@ const getSocketSettings = (hash       )                => {
 };
 
 class ClusterNode extends events.EventEmitter {
-                   
-                   
-                         
-                                        
-                        
-                                       
+                           
+                           
+                                 
                                                 
-                                                     
-                                             
-                                             
-               
-                                            
-                                                 
                                 
-                     
-                                       
-                                             
-                  
-                                         
-                      
+                                               
+                                                        
+                                                             
+                                                     
+                                                     
+                       
+                                                    
+                                                         
+                                        
+                             
+                                               
                                                   
+                                                     
+                          
+                                                 
+                                                      
+                            
+                                                          
 
   constructor(options          = {}) {
     super();
@@ -196,6 +197,27 @@ class ClusterNode extends events.EventEmitter {
         });
       }
     });
+    const heartbeatInterval = options.heartbeatInterval || 5000;
+    this.peerSocketHeartbeats = {};
+    this.subscribe('_clusterHeartbeat', (message       ) => {
+      const { socketHash } = message;
+      if (typeof socketHash !== 'string') {
+        this.emit('error', 'Received unknown socket hash from cluster heartbeat');
+        return;
+      }
+      this.peerSocketHeartbeats[socketHash] = Date.now();
+    });
+    this.clusterHeartbeatInterval = setInterval(() => {
+      this.sendToAll('_clusterHeartbeat', {
+        socketHash: this.socketHash,
+      });
+      Object.keys(this.peerSocketHeartbeats).forEach((socketHash) => {
+        if (this.peerSocketHeartbeats[socketHash] + heartbeatInterval * 2.5 > Date.now()) {
+          return;
+        }
+        this.removePeer(getSocketSettings(socketHash));
+      });
+    }, heartbeatInterval);
     // Connect to peers included in the options
     clusterOptions.peerAddresses.forEach(this.addPeer.bind(this));
     setImmediate(() => {
@@ -269,6 +291,9 @@ class ClusterNode extends events.EventEmitter {
     this.stopDiscovery();
     if (this.clusterUpdateTimeout) {
       clearTimeout(this.clusterUpdateTimeout);
+    }
+    if (this.clusterHeartbeatInterval) {
+      clearInterval(this.clusterHeartbeatInterval);
     }
     this.sendToAll('_clusterRemovePeer', {
       peerAddress: getSocketSettings(this.socketHash),

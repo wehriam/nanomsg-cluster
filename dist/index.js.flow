@@ -35,11 +35,10 @@ type ConnectSocket = {
 };
 
 type Options = {
-  cluster?: {
-    bindAddress?: SocketSettings,
-    peerAddresses?: Array<SocketSettings>,
-  },
-  name?: string
+  bindAddress?: SocketSettings,
+  peerAddresses?: Array<SocketSettings>,
+  name?: string,
+  heartbeatInterval?: number
 };
 
 const DEFAULT_PUBSUB_PORT = 13001;
@@ -60,27 +59,29 @@ const getSocketSettings = (hash:string):SocketSettings => {
 };
 
 class ClusterNode extends events.EventEmitter {
-  isReady: boolean;
-  options: Options;
-  pullSocket: BindSocket;
-  pushSockets: {[string]:ConnectSocket};
-  pubSocket: BindSocket;
-  subSockets: {[string]:ConnectSocket};
-  pipelinePushSockets: {[string]:ConnectSocket};
-  namedPipelinePushSockets: {[string]:ConnectSocket};
-  pipelinePullSockets: {[string]:BindSocket};
-  pipelinePullBindAddress: {[string]:string};
-  name: string;
-  subscriptions: {[string]:Array<Function>};
-  localSubscriptions: {[string]:Array<Function>};
-  boundReceiveMessage: Function;
-  socketHash: string;
-  peerSocketHashes: {[string]:boolean};
-  namedPushSockets: {[string]:ConnectSocket};
-  closed: boolean;
-  clusterUpdateTimeout: TimeoutID | void;
-  discovery: Discover;
-  pipelineConsumerCache: {[string]:Array<string>};
+  declare isReady: boolean;
+  declare options: Options;
+  declare pullSocket: BindSocket;
+  declare pushSockets: {[string]:ConnectSocket};
+  declare pubSocket: BindSocket;
+  declare subSockets: {[string]:ConnectSocket};
+  declare pipelinePushSockets: {[string]:ConnectSocket};
+  declare namedPipelinePushSockets: {[string]:ConnectSocket};
+  declare pipelinePullSockets: {[string]:BindSocket};
+  declare pipelinePullBindAddress: {[string]:string};
+  declare name: string;
+  declare subscriptions: {[string]:Array<Function>};
+  declare localSubscriptions: {[string]:Array<Function>};
+  declare boundReceiveMessage: Function;
+  declare socketHash: string;
+  declare peerSocketHashes: {[string]:boolean};
+  declare peerSocketHeartbeats: {[string]:number};
+  declare namedPushSockets: {[string]:ConnectSocket};
+  declare closed: boolean;
+  declare clusterUpdateTimeout: TimeoutID | void;
+  declare clusterHeartbeatInterval: IntervalID | void;
+  declare discovery: Object;
+  declare pipelineConsumerCache: {[string]:Array<string>};
 
   constructor(options?:Options = {}) {
     super();
@@ -196,6 +197,27 @@ class ClusterNode extends events.EventEmitter {
         });
       }
     });
+    const heartbeatInterval = options.heartbeatInterval || 5000;
+    this.peerSocketHeartbeats = {};
+    this.subscribe('_clusterHeartbeat', (message:Object) => {
+      const { socketHash } = message;
+      if (typeof socketHash !== 'string') {
+        this.emit('error', 'Received unknown socket hash from cluster heartbeat');
+        return;
+      }
+      this.peerSocketHeartbeats[socketHash] = Date.now();
+    });
+    this.clusterHeartbeatInterval = setInterval(() => {
+      this.sendToAll('_clusterHeartbeat', {
+        socketHash: this.socketHash,
+      });
+      Object.keys(this.peerSocketHeartbeats).forEach((socketHash) => {
+        if (this.peerSocketHeartbeats[socketHash] + heartbeatInterval * 2.5 > Date.now()) {
+          return;
+        }
+        this.removePeer(getSocketSettings(socketHash));
+      });
+    }, heartbeatInterval);
     // Connect to peers included in the options
     clusterOptions.peerAddresses.forEach(this.addPeer.bind(this));
     setImmediate(() => {
@@ -269,6 +291,9 @@ class ClusterNode extends events.EventEmitter {
     this.stopDiscovery();
     if (this.clusterUpdateTimeout) {
       clearTimeout(this.clusterUpdateTimeout);
+    }
+    if (this.clusterHeartbeatInterval) {
+      clearInterval(this.clusterHeartbeatInterval);
     }
     this.sendToAll('_clusterRemovePeer', {
       peerAddress: getSocketSettings(this.socketHash),
