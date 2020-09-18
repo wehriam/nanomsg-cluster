@@ -164,9 +164,20 @@ class ClusterNode extends events.EventEmitter {
     this.subscribe('_clusterAddPeers', (message       ) => {
       const peerSocketHashes = [message.socketHash].concat(message.peerSocketHashes.filter((peerSocketHash) => this.socketHash !== peerSocketHash));
       peerSocketHashes.forEach((socketHash) => {
+        const socketSettings = getSocketSettings(socketHash);
+        if (!this.peerSocketHashes[socketHash]) {
+          const pushConnectAddress = `tcp://${socketSettings.host}:${socketSettings.pipelinePort || DEFAULT_PIPELINE_PORT}`;
+          const push = this.pushSockets[pushConnectAddress];
+          if (push) {
+            push.send(encode(['_clusterAddPeers', {
+              socketHash: this.socketHash,
+              peerSocketHashes: Object.keys(this.peerSocketHashes),
+            }]));
+          }
+        }
         const name = socketHash.split('/').shift();
         this.peerSocketHashes[socketHash] = true;
-        const socketSettings = getSocketSettings(socketHash);
+        this.peerSocketHeartbeats[socketHash] = Date.now();
         if (!this.namedPushSockets[name]) {
           this.emit('addPeer', socketSettings);
         }

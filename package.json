@@ -1,6 +1,6 @@
 {
   "name": "nanomsg-cluster",
-  "version": "0.6.13",
+  "version": "0.6.14",
   "description": "Nanomsg based clustering",
   "main": "dist/index.js",
   "scripts": {
@@ -16,7 +16,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "yarn lint && yarn documentation && yarn build && git add dist"
+      "pre-commit": "yarn lint && yarn build && git add dist"
     }
   },
   "jest": {
@@ -51,6 +51,7 @@
     "babel-eslint": "^10.1.0",
     "codecov": "^3.7.2",
     "cross-env": "^7.0.2",
+    "documentation": "^13.0.2",
     "eslint": "^7.7.0",
     "eslint-config-bunchtogether": "^1.1.6",
     "eslint-plugin-flowtype": "^5.2.0",
@@ -59,21 +60,15 @@
     "eslint-plugin-jest": "^23.20.0",
     "eslint-plugin-jsx-a11y": "^6.3.1",
     "eslint-plugin-react": "^7.20.6",
-    "expect": "^26.0.1",
-    "flow-bin": "^0.125.1",
-    "flow-copy-source": "^2.0.9",
-    "flow-remove-types": "^2.125.1",
-    "flow-typed": "^3.1.0",
-    "husky": "^4.2.5",
-    "jest": "^26.0.1",
-    "jest-diff": "^26.4.2",
     "expect": "^26.4.2",
     "flow-bin": "^0.132.0",
     "flow-copy-source": "^2.0.9",
     "flow-remove-types": "^2.132.0",
     "flow-typed": "^3.2.1",
+    "husky": "^4.2.5",
     "ip": "^1.1.5",
     "jest": "^26.4.2",
+    "jest-diff": "^26.4.2",
     "pre-commit": "^1.2.2",
     "uuid": "^8.3.0"
   },
