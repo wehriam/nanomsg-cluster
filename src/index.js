@@ -226,6 +226,7 @@ class ClusterNode extends events.EventEmitter {
         if (this.peerSocketHeartbeats[socketHash] + heartbeatInterval * 2.5 > Date.now()) {
           return;
         }
+        delete this.peerSocketHeartbeats[socketHash];
         this.removePeer(getSocketSettings(socketHash));
       });
     }, heartbeatInterval);
@@ -451,6 +452,9 @@ class ClusterNode extends events.EventEmitter {
   async closeSubSocket(address:string):Promise<void> {
     const sub = this.subSockets[address];
     delete this.subSockets[address];
+    if (!sub) {
+      return;
+    }
     sub.removeListener('data', this.boundReceiveMessage);
     await new Promise((resolve, reject) => {
       sub.on('close', resolve);
@@ -462,6 +466,9 @@ class ClusterNode extends events.EventEmitter {
   async closePushSocket(address:string):Promise<void> {
     const push = this.pushSockets[address];
     delete this.pushSockets[address];
+    if (!push) {
+      return;
+    }
     await new Promise((resolve, reject) => {
       push.on('close', resolve);
       push.on('error', reject);
@@ -486,6 +493,9 @@ class ClusterNode extends events.EventEmitter {
   async closePipelinePushSocket(topic:string):Promise<void> {
     const push = this.pipelinePushSockets[topic];
     delete this.pipelinePushSockets[topic];
+    if (!push) {
+      return;
+    }
     await new Promise((resolve, reject) => {
       push.on('close', resolve);
       push.on('error', reject);
