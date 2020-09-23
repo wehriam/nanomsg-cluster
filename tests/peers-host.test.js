@@ -163,5 +163,8 @@ test('nodes close gracefuly.', async () => {
   await nodeA.close();
   await nodeB.close();
   await nodeC.close();
+  nodeA.throwOnLeakedReferences();
+  nodeB.throwOnLeakedReferences();
+  nodeC.throwOnLeakedReferences();
 });
 

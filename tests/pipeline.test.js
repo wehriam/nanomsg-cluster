@@ -190,6 +190,7 @@ test('nodeA unsubscribes and resubscribes to topic2', async () => {
   nodeC.sendToPipeline(topic2, message2);
   await messageTimeout();
   expect(callback2).toHaveBeenCalledTimes(4);
+  nodeA.unsubscribe(topic2, callback2);
 });
 
 test('nodeA stops consuming pipeline', async () => {
@@ -298,6 +299,9 @@ test('Pipeline nodes choose a leader', async () => {
     expect(peers[0]).not.toEqual(nameC);
   }
   expect(hasLeader).toEqual(true);
+  nodeA.unsubscribe(topicLeader, leaderCallback1);
+  nodeB.unsubscribe(topicLeader, leaderCallback2);
+  nodeC.unsubscribe(topicLeader, leaderCallback3);
 });
 
 test('nodeB and nodeC stop consuming topic 1.', async () => {
@@ -336,12 +340,21 @@ test('nodeA closes gracefuly.', async () => {
   await nodeDRemovePeerPromise;
   await nodeERemovePeerPromise;
   await messageTimeout();
+  nodeA.throwOnLeakedReferences();
 });
 
 test('nodeA, nodeC, nodeD, and nodeE close gracefuly.', async () => {
+  nodeB.unsubscribe(topic1, callback1);
+  nodeC.unsubscribe(topic1, callback1);
+  nodeD.unsubscribe(topic3, callback3);
+  nodeE.unsubscribe(topic4, callback4);
   await nodeB.close();
   await nodeC.close();
   await nodeD.close();
   await nodeE.close();
+  nodeB.throwOnLeakedReferences();
+  nodeC.throwOnLeakedReferences();
+  nodeD.throwOnLeakedReferences();
+  nodeE.throwOnLeakedReferences();
 });
 

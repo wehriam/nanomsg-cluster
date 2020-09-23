@@ -136,6 +136,7 @@ test('nodeA closes gracefuly.', async () => {
   await nodeA.close();
   await nodeBRemovePeerAPromise;
   await nodeCRemovePeerAPromise;
+  nodeA.throwOnLeakedReferences();
 });
 
 test('nodeB closes gracefuly.', async () => {
@@ -148,9 +149,11 @@ test('nodeB closes gracefuly.', async () => {
   });
   await nodeB.close();
   await nodeCRemovePeerBPromise;
+  nodeB.throwOnLeakedReferences();
 });
 
 test('nodeC closes gracefuly.', async () => {
   await nodeC.close();
+  nodeC.throwOnLeakedReferences();
 });
 

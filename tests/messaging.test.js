@@ -117,6 +117,7 @@ test('nodeA unsubscribes from messages to itself', async () => {
   await messageTimeout();
   expect(callbackAA).not.toHaveBeenCalledWith(message9, nameA);
   expect(callbackB).toHaveBeenCalledWith(message9, nameA);
+  nodeB.unsubscribe(topic1A, callbackB);
 });
 
 test('nodeA sends a message', async () => {
@@ -143,9 +144,13 @@ test('should remove a peerAddress from the cluster', async () => {
   expect(callbackA).not.toHaveBeenCalledWith(message7);
   expect(callbackB).not.toHaveBeenCalledWith(message7);
   expect(callbackC).not.toHaveBeenCalledWith(message7);
+  nodeA.unsubscribe(topic2, callbackA);
+  nodeB.unsubscribe(topic2, callbackB);
+  nodeC.unsubscribe(topic2, callbackC);
 });
 
 test('nodeB can not be closed more than once.', async () => {
+  nodeB.unsubscribe(topic1, callbackB);
   await nodeB.close();
   try {
     await nodeB.close();
@@ -155,10 +160,14 @@ test('nodeB can not be closed more than once.', async () => {
     }).toThrow(/Already closed/);
   }
   await messageTimeout();
+  nodeB.throwOnLeakedReferences();
 });
 
 test('nodeA and nodeC close gracefuly.', async () => {
+  nodeA.unsubscribe(topic1, callbackA);
+  nodeC.unsubscribe(topic1, callbackC);
   await nodeA.close();
   await nodeC.close();
+  nodeA.throwOnLeakedReferences();
 });
 

@@ -34,11 +34,10 @@ beforeAll(async () => {
   nodeA = await getNode(nameA, addressA, []);
 });
 
-afterAll(async () => {
-  await nodeA.close();
-});
-
 test('Connects to a non-existent node', async () => {
   nodeA.addPeer(addressB);
   nodeA.sendToAll(topic1, message1);
+  await nodeA.close();
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  nodeA.throwOnLeakedReferences();
 });

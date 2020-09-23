@@ -34,6 +34,7 @@ const addressC = {
 let nodeA;
 let nodeB;
 let nodeC;
+
 const nameA = uuid.v4();
 const nameB = uuid.v4();
 const nameC = uuid.v4();
@@ -45,11 +46,6 @@ beforeAll(async () => {
   nodeB.addPeer(addressA);
   nodeA.addPeer(addressC);
   await messageTimeout();
-});
-
-afterAll(async () => {
-  await nodeB.close();
-  await nodeC.close();
 });
 
 
@@ -77,18 +73,14 @@ test('nodeA closes ungracefully, nodeB and nodeC remove peer.', async () => {
   }
   await Promise.all(Object.keys(nodeA.pipelinePushSockets).map(nodeA.closePipelinePushSocket.bind(nodeA)));
   await Promise.all(Object.keys(nodeA.pipelinePullSockets).map(nodeA.closePipelinePullSocket.bind(nodeA)));
-  nodeA.pullSocket.removeListener('data', nodeA.boundReceiveMessage);
-  await new Promise((resolve) => {
-    nodeA.pullSocket.on('close', resolve);
-    nodeA.pullSocket.close();
-  });
-  await new Promise((resolve) => {
-    nodeA.pubSocket.on('close', resolve);
-    nodeA.pubSocket.close();
-  });
-  await Promise.all(Object.keys(nodeA.subSockets).map(nodeA.closeSubSocket.bind(nodeA)));
-  await Promise.all(Object.keys(nodeA.pushSockets).map(nodeA.closePushSocket.bind(nodeA)));
+  nodeA.stopHeartbeat();
   await nodeBRemovePeerAPromise;
   await nodeCRemovePeerAPromise;
+  await nodeA.close();
+  await nodeB.close();
+  await nodeC.close();
+  nodeA.throwOnLeakedReferences();
+  nodeB.throwOnLeakedReferences();
+  nodeC.throwOnLeakedReferences();
 });
 
