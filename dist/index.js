@@ -96,6 +96,8 @@ class ClusterNode extends events.EventEmitter {
                                                       
                             
                                     
+                                             
+                                                  
 
   constructor(options          = {}) {
     super();
@@ -250,6 +252,7 @@ class ClusterNode extends events.EventEmitter {
       this.isReady = true;
       this.emit('ready');
     });
+    this.advertisePeersInterval = setInterval(this.advertisePeers.bind(this), 60000);
   }
 
   startHeartbeat()      {
@@ -361,6 +364,10 @@ class ClusterNode extends events.EventEmitter {
       throw new Error('Already closed.');
     }
     this.stopDiscovery();
+    if (this.advertisePeersTimeout) {
+      clearTimeout(this.advertisePeersTimeout);
+    }
+    clearInterval(this.advertisePeersInterval);
     if (this.clusterUpdateTimeout) {
       clearTimeout(this.clusterUpdateTimeout);
     }
@@ -476,8 +483,19 @@ class ClusterNode extends events.EventEmitter {
       });
       delete this.clusterUpdateTimeout;
       this.advertisePipelines();
-    }, 10);
+    }, 100);
+    clearTimeout(this.advertisePeersTimeout);
+    this.advertisePeersTimeout = setTimeout(this.advertisePeers.bind(this), 5000);
     return this.pushSockets[pushConnectAddress];
+  }
+
+  async advertisePeers()               {
+    this.sendToAll('_clusterAddPeers', {
+      socketHash: this.socketHash,
+      peerSocketHashes: Object.keys(this.peerSocketHashes),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    this.advertisePipelines();
   }
 
   async removeHost(host       , sendToAll           = true)               {
@@ -561,6 +579,8 @@ class ClusterNode extends events.EventEmitter {
     for (const removedPeer of removedPeers) {
       this.emit('removePeer', removedPeer);
     }
+    clearTimeout(this.advertisePeersTimeout);
+    this.advertisePeersTimeout = setTimeout(this.advertisePeers.bind(this), 5000);
   }
 
   async closeSubSocket(address       )               {

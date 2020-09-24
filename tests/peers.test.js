@@ -123,6 +123,10 @@ describe('Peers', () => {
     }
   });
 
+  test('Nodes advertise peers.', async () => {
+    await nodeA.advertisePeers();
+  });
+
   test('nodeA closes gracefuly.', async () => {
     const nodeBRemovePeerAPromise = new Promise((resolve) => {
       nodeB.on('removePeer', (peerAddress) => {
