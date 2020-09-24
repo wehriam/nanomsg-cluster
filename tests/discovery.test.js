@@ -42,118 +42,120 @@ const nameC = uuid.v4();
 
 jest.setTimeout(10000);
 
-beforeAll(async () => {
-  nodeA = await getNode(nameA, addressA, []);
-  nodeB = await getNode(nameB, addressB, []);
-  nodeC = await getNode(nameC, addressC, []);
-  await messageTimeout();
-});
+describe('Discovery', () => {
+  beforeAll(async () => {
+    nodeA = await getNode(nameA, addressA, []);
+    nodeB = await getNode(nameB, addressB, []);
+    nodeC = await getNode(nameC, addressC, []);
+    await messageTimeout();
+  });
 
-test('nodeA starts discovery.', async () => {
-  await nodeA.startDiscovery({
-    port: discoveryPort,
-    ignoreProcess: false,
+  test('nodeA starts discovery.', async () => {
+    await nodeA.startDiscovery({
+      port: discoveryPort,
+      ignoreProcess: false,
+    });
   });
-});
 
-test('nodeB starts discovery.', async () => {
-  const nodeAAddPeerBPromise = new Promise((resolve) => {
-    nodeA.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameB) {
-        resolve();
-      }
+  test('nodeB starts discovery.', async () => {
+    const nodeAAddPeerBPromise = new Promise((resolve) => {
+      nodeA.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameB) {
+          resolve();
+        }
+      });
     });
-  });
-  const nodeBAddPeerAPromise = new Promise((resolve) => {
-    nodeB.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
+    const nodeBAddPeerAPromise = new Promise((resolve) => {
+      nodeB.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
     });
+    await nodeB.startDiscovery({
+      port: discoveryPort,
+      ignoreProcess: false,
+    });
+    await nodeAAddPeerBPromise;
+    await nodeBAddPeerAPromise;
   });
-  await nodeB.startDiscovery({
-    port: discoveryPort,
-    ignoreProcess: false,
-  });
-  await nodeAAddPeerBPromise;
-  await nodeBAddPeerAPromise;
-});
 
-test('nodeC starts discovery.', async () => {
-  const nodeAAddPeerCPromise = new Promise((resolve) => {
-    nodeA.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameC) {
-        resolve();
-      }
+  test('nodeC starts discovery.', async () => {
+    const nodeAAddPeerCPromise = new Promise((resolve) => {
+      nodeA.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameC) {
+          resolve();
+        }
+      });
     });
-  });
-  const nodeBAddPeerCPromise = new Promise((resolve) => {
-    nodeB.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameC) {
-        resolve();
-      }
+    const nodeBAddPeerCPromise = new Promise((resolve) => {
+      nodeB.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameC) {
+          resolve();
+        }
+      });
     });
-  });
-  const nodeCAddPeerAPromise = new Promise((resolve) => {
-    nodeC.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
+    const nodeCAddPeerAPromise = new Promise((resolve) => {
+      nodeC.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
     });
-  });
-  const nodeCAddPeerBPromise = new Promise((resolve) => {
-    nodeC.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
+    const nodeCAddPeerBPromise = new Promise((resolve) => {
+      nodeC.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
     });
+    await nodeC.startDiscovery({
+      port: discoveryPort,
+      ignoreProcess: false,
+    });
+    await nodeAAddPeerCPromise;
+    await nodeBAddPeerCPromise;
+    await nodeCAddPeerAPromise;
+    await nodeCAddPeerBPromise;
   });
-  await nodeC.startDiscovery({
-    port: discoveryPort,
-    ignoreProcess: false,
-  });
-  await nodeAAddPeerCPromise;
-  await nodeBAddPeerCPromise;
-  await nodeCAddPeerAPromise;
-  await nodeCAddPeerBPromise;
-});
 
-test('nodeA closes gracefuly.', async () => {
-  const nodeBRemovePeerAPromise = new Promise((resolve) => {
-    nodeB.on('removePeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
+  test('nodeA closes gracefuly.', async () => {
+    const nodeBRemovePeerAPromise = new Promise((resolve) => {
+      nodeB.on('removePeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
     });
-  });
-  const nodeCRemovePeerAPromise = new Promise((resolve) => {
-    nodeC.on('removePeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
+    const nodeCRemovePeerAPromise = new Promise((resolve) => {
+      nodeC.on('removePeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
     });
+    await nodeA.close();
+    await nodeBRemovePeerAPromise;
+    await nodeCRemovePeerAPromise;
+    nodeA.throwOnLeakedReferences();
   });
-  await nodeA.close();
-  await nodeBRemovePeerAPromise;
-  await nodeCRemovePeerAPromise;
-  nodeA.throwOnLeakedReferences();
-});
 
-test('nodeB closes gracefuly.', async () => {
-  const nodeCRemovePeerBPromise = new Promise((resolve) => {
-    nodeC.on('removePeer', (peerAddress) => {
-      if (peerAddress.name === nameB) {
-        resolve();
-      }
+  test('nodeB closes gracefuly.', async () => {
+    const nodeCRemovePeerBPromise = new Promise((resolve) => {
+      nodeC.on('removePeer', (peerAddress) => {
+        if (peerAddress.name === nameB) {
+          resolve();
+        }
+      });
     });
+    await nodeB.close();
+    await nodeCRemovePeerBPromise;
+    nodeB.throwOnLeakedReferences();
   });
-  await nodeB.close();
-  await nodeCRemovePeerBPromise;
-  nodeB.throwOnLeakedReferences();
-});
 
-test('nodeC closes gracefuly.', async () => {
-  await nodeC.close();
-  nodeC.throwOnLeakedReferences();
+  test('nodeC closes gracefuly.', async () => {
+    await nodeC.close();
+    nodeC.throwOnLeakedReferences();
+  });
 });
 

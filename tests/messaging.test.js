@@ -53,121 +53,123 @@ const message7 = { [uuid.v4()]: uuid.v4() };
 const message8 = { [uuid.v4()]: uuid.v4() };
 const message9 = { [uuid.v4()]: uuid.v4() };
 
-beforeAll(async () => {
-  nodeA = await getNode(nameA, addressA, []);
-  nodeB = await getNode(nameB, addressB, [addressA]);
-  nodeC = await getNode(nameC, addressC, [addressA]);
-});
+describe('Messaging', () => {
+  beforeAll(async () => {
+    nodeA = await getNode(nameA, addressA, []);
+    nodeB = await getNode(nameB, addressB, [addressA]);
+    nodeC = await getNode(nameC, addressC, [addressA]);
+  });
 
-test('subscribes to a topic', async () => {
-  nodeA.subscribe(topic1, callbackA);
-  nodeB.subscribe(topic1, callbackB);
-  nodeC.subscribe(topic1, callbackC);
-  expect(callbackA).toHaveBeenCalledTimes(0);
-  await messageTimeout();
-});
+  test('subscribes to a topic', async () => {
+    nodeA.subscribe(topic1, callbackA);
+    nodeB.subscribe(topic1, callbackB);
+    nodeC.subscribe(topic1, callbackC);
+    expect(callbackA).toHaveBeenCalledTimes(0);
+    await messageTimeout();
+  });
 
-test('nodeB sends a message', async () => {
-  nodeB.sendToAll(topic1, message1);
-  await messageTimeout();
-});
+  test('nodeB sends a message', async () => {
+    nodeB.sendToAll(topic1, message1);
+    await messageTimeout();
+  });
 
-test('nodeA and nodeC have received the message', () => {
-  expect(callbackA).toHaveBeenCalledWith(message1, nameB);
-  expect(callbackB).toHaveBeenCalledTimes(0);
-  expect(callbackC).toHaveBeenCalledWith(message1, nameB);
-});
+  test('nodeA and nodeC have received the message', () => {
+    expect(callbackA).toHaveBeenCalledWith(message1, nameB);
+    expect(callbackB).toHaveBeenCalledTimes(0);
+    expect(callbackC).toHaveBeenCalledWith(message1, nameB);
+  });
 
-test('nodeC sends a message', async () => {
-  nodeC.sendToAll(topic1, message2);
-  await messageTimeout();
-});
+  test('nodeC sends a message', async () => {
+    nodeC.sendToAll(topic1, message2);
+    await messageTimeout();
+  });
 
-test('nodeA and nodeB have received the message', () => {
-  expect(callbackA).toHaveBeenCalledWith(message2, nameC);
-  expect(callbackB).toHaveBeenCalledWith(message2, nameC);
-  expect(callbackC).toHaveBeenCalledWith(message1, nameB);
-});
+  test('nodeA and nodeB have received the message', () => {
+    expect(callbackA).toHaveBeenCalledWith(message2, nameC);
+    expect(callbackB).toHaveBeenCalledWith(message2, nameC);
+    expect(callbackC).toHaveBeenCalledWith(message1, nameB);
+  });
 
-test('nodeA and nodeC send messages at the same time', async () => {
-  nodeC.sendToAll(topic1, message3);
-  nodeA.sendToAll(topic1, message4);
-  await messageTimeout();
-});
+  test('nodeA and nodeC send messages at the same time', async () => {
+    nodeC.sendToAll(topic1, message3);
+    nodeA.sendToAll(topic1, message4);
+    await messageTimeout();
+  });
 
-test('nodeA and nodeB have received the message', () => {
-  expect(callbackA).toHaveBeenCalledWith(message3, nameC);
-  expect(callbackB).toHaveBeenCalledWith(message4, nameA);
-  expect(callbackB).toHaveBeenCalledWith(message3, nameC);
-  expect(callbackC).toHaveBeenCalledWith(message4, nameA);
-});
+  test('nodeA and nodeB have received the message', () => {
+    expect(callbackA).toHaveBeenCalledWith(message3, nameC);
+    expect(callbackB).toHaveBeenCalledWith(message4, nameA);
+    expect(callbackB).toHaveBeenCalledWith(message3, nameC);
+    expect(callbackC).toHaveBeenCalledWith(message4, nameA);
+  });
 
-test('nodeA sends a message to itself', async () => {
-  nodeA.subscribe(topic1A, callbackAA, true);
-  nodeB.subscribe(topic1A, callbackB, true);
-  nodeA.sendToAll(topic1A, message8);
-  await messageTimeout();
-  expect(callbackAA).toHaveBeenCalledWith(message8, nameA);
-  expect(callbackB).toHaveBeenCalledWith(message8, nameA);
-});
+  test('nodeA sends a message to itself', async () => {
+    nodeA.subscribe(topic1A, callbackAA, true);
+    nodeB.subscribe(topic1A, callbackB, true);
+    nodeA.sendToAll(topic1A, message8);
+    await messageTimeout();
+    expect(callbackAA).toHaveBeenCalledWith(message8, nameA);
+    expect(callbackB).toHaveBeenCalledWith(message8, nameA);
+  });
 
-test('nodeA unsubscribes from messages to itself', async () => {
-  nodeA.unsubscribe(topic1A, callbackAA);
-  nodeA.sendToAll(topic1A, message9);
-  await messageTimeout();
-  expect(callbackAA).not.toHaveBeenCalledWith(message9, nameA);
-  expect(callbackB).toHaveBeenCalledWith(message9, nameA);
-  nodeB.unsubscribe(topic1A, callbackB);
-});
+  test('nodeA unsubscribes from messages to itself', async () => {
+    nodeA.unsubscribe(topic1A, callbackAA);
+    nodeA.sendToAll(topic1A, message9);
+    await messageTimeout();
+    expect(callbackAA).not.toHaveBeenCalledWith(message9, nameA);
+    expect(callbackB).toHaveBeenCalledWith(message9, nameA);
+    nodeB.unsubscribe(topic1A, callbackB);
+  });
 
-test('nodeA sends a message', async () => {
-  nodeA.sendToAll(topic1, message5);
-  await messageTimeout();
-  expect(callbackA).not.toHaveBeenCalledWith(message5);
-});
+  test('nodeA sends a message', async () => {
+    nodeA.sendToAll(topic1, message5);
+    await messageTimeout();
+    expect(callbackA).not.toHaveBeenCalledWith(message5);
+  });
 
-test('only connector c has received the message', async () => {
-  nodeA.sendToPeer(nameC, topic1, message6);
-  await messageTimeout();
-  expect(callbackA).not.toHaveBeenCalledWith(message6, nameA);
-  expect(callbackB).not.toHaveBeenCalledWith(message6, nameA);
-  expect(callbackC).toHaveBeenCalledWith(message6, nameA);
-});
+  test('only connector c has received the message', async () => {
+    nodeA.sendToPeer(nameC, topic1, message6);
+    await messageTimeout();
+    expect(callbackA).not.toHaveBeenCalledWith(message6, nameA);
+    expect(callbackB).not.toHaveBeenCalledWith(message6, nameA);
+    expect(callbackC).toHaveBeenCalledWith(message6, nameA);
+  });
 
-test('should remove a peerAddress from the cluster', async () => {
-  nodeA.subscribe(topic2, callbackA);
-  nodeB.subscribe(topic2, callbackB);
-  nodeC.subscribe(topic2, callbackC);
-  nodeC.removePeer(addressA);
-  await messageTimeout();
-  nodeA.sendToAll(topic2, message7);
-  expect(callbackA).not.toHaveBeenCalledWith(message7);
-  expect(callbackB).not.toHaveBeenCalledWith(message7);
-  expect(callbackC).not.toHaveBeenCalledWith(message7);
-  nodeA.unsubscribe(topic2, callbackA);
-  nodeB.unsubscribe(topic2, callbackB);
-  nodeC.unsubscribe(topic2, callbackC);
-});
+  test('should remove a peerAddress from the cluster', async () => {
+    nodeA.subscribe(topic2, callbackA);
+    nodeB.subscribe(topic2, callbackB);
+    nodeC.subscribe(topic2, callbackC);
+    nodeC.removePeer(addressA);
+    await messageTimeout();
+    nodeA.sendToAll(topic2, message7);
+    expect(callbackA).not.toHaveBeenCalledWith(message7);
+    expect(callbackB).not.toHaveBeenCalledWith(message7);
+    expect(callbackC).not.toHaveBeenCalledWith(message7);
+    nodeA.unsubscribe(topic2, callbackA);
+    nodeB.unsubscribe(topic2, callbackB);
+    nodeC.unsubscribe(topic2, callbackC);
+  });
 
-test('nodeB can not be closed more than once.', async () => {
-  nodeB.unsubscribe(topic1, callbackB);
-  await nodeB.close();
-  try {
+  test('nodeB can not be closed more than once.', async () => {
+    nodeB.unsubscribe(topic1, callbackB);
     await nodeB.close();
-  } catch (e) {
-    expect(() => {
-      throw e;
-    }).toThrow(/Already closed/);
-  }
-  await messageTimeout();
-  nodeB.throwOnLeakedReferences();
-});
+    try {
+      await nodeB.close();
+    } catch (e) {
+      expect(() => {
+        throw e;
+      }).toThrow(/Already closed/);
+    }
+    await messageTimeout();
+    nodeB.throwOnLeakedReferences();
+  });
 
-test('nodeA and nodeC close gracefuly.', async () => {
-  nodeA.unsubscribe(topic1, callbackA);
-  nodeC.unsubscribe(topic1, callbackC);
-  await nodeA.close();
-  await nodeC.close();
-  nodeA.throwOnLeakedReferences();
+  test('nodeA and nodeC close gracefuly.', async () => {
+    nodeA.unsubscribe(topic1, callbackA);
+    nodeC.unsubscribe(topic1, callbackC);
+    await nodeA.close();
+    await nodeC.close();
+    nodeA.throwOnLeakedReferences();
+  });
 });
 

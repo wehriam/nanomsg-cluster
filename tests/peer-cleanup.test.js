@@ -29,47 +29,49 @@ let nodeB;
 const nameA = uuid.v4();
 const nameB = uuid.v4();
 
-test('Node A and Node B cleanup after disconnect', async () => {
-  nodeA = await getNode(nameA, addressA, [], 50);
-  nodeB = await getNode(nameB, addressB, [], 50);
-  nodeB.addPeer(addressA);
-  await messageTimeout();
-  expect(nodeA.getPeerNames()).toEqual([nameB]);
-  expect(nodeB.getPeerNames()).toEqual([nameA]);
-  await nodeA.close();
-  await nodeB.close();
-  nodeA.throwOnLeakedReferences();
-  nodeB.throwOnLeakedReferences();
-});
+describe('Peer Cleanup', () => {
+  test('Node A and Node B cleanup after disconnect', async () => {
+    nodeA = await getNode(nameA, addressA, [], 50);
+    nodeB = await getNode(nameB, addressB, [], 50);
+    nodeB.addPeer(addressA);
+    await messageTimeout();
+    expect(nodeA.getPeerNames()).toEqual([nameB]);
+    expect(nodeB.getPeerNames()).toEqual([nameA]);
+    await nodeA.close();
+    await nodeB.close();
+    nodeA.throwOnLeakedReferences();
+    nodeB.throwOnLeakedReferences();
+  });
 
-test('Node B disconnects in response to node A disconnect', async () => {
-  nodeA = await getNode(nameA, addressA, [], 50);
-  nodeB = await getNode(nameB, addressB, [], 50);
-  nodeB.addPeer(addressA);
-  await messageTimeout();
-  expect(nodeA.getPeerNames()).toEqual([nameB]);
-  expect(nodeB.getPeerNames()).toEqual([nameA]);
-  await nodeA.removePeer(addressB);
-  await messageTimeout();
-  nodeA.throwOnLeakedReferences();
-  nodeB.throwOnLeakedReferences();
-  await nodeA.close();
-  await nodeB.close();
-});
+  test('Node B disconnects in response to node A disconnect', async () => {
+    nodeA = await getNode(nameA, addressA, [], 50);
+    nodeB = await getNode(nameB, addressB, [], 50);
+    nodeB.addPeer(addressA);
+    await messageTimeout();
+    expect(nodeA.getPeerNames()).toEqual([nameB]);
+    expect(nodeB.getPeerNames()).toEqual([nameA]);
+    await nodeA.removePeer(addressB);
+    await messageTimeout();
+    nodeA.throwOnLeakedReferences();
+    nodeB.throwOnLeakedReferences();
+    await nodeA.close();
+    await nodeB.close();
+  });
 
 
-test('Node A disconnects in response to node B heartbeat timeout', async () => {
-  nodeA = await getNode(nameA, addressA, [], 50);
-  nodeB = await getNode(nameB, addressB, [], 50);
-  nodeB.addPeer(addressA);
-  await messageTimeout();
-  expect(nodeA.getPeerNames()).toEqual([nameB]);
-  expect(nodeB.getPeerNames()).toEqual([nameA]);
-  clearInterval(nodeB.clusterHeartbeatInterval);
-  await messageTimeout();
-  nodeA.throwOnLeakedReferences();
-  nodeB.throwOnLeakedReferences();
-  await nodeA.close();
-  await nodeB.close();
+  test('Node A disconnects in response to node B heartbeat timeout', async () => {
+    nodeA = await getNode(nameA, addressA, [], 50);
+    nodeB = await getNode(nameB, addressB, [], 50);
+    nodeB.addPeer(addressA);
+    await messageTimeout();
+    expect(nodeA.getPeerNames()).toEqual([nameB]);
+    expect(nodeB.getPeerNames()).toEqual([nameA]);
+    clearInterval(nodeB.clusterHeartbeatInterval);
+    await messageTimeout();
+    nodeA.throwOnLeakedReferences();
+    nodeB.throwOnLeakedReferences();
+    await nodeA.close();
+    await nodeB.close();
+  });
 });
 

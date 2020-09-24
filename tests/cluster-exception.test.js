@@ -30,14 +30,16 @@ const nameA = uuid.v4();
 const topic1 = uuid.v4();
 const message1 = { [uuid.v4()]: uuid.v4() };
 
-beforeAll(async () => {
-  nodeA = await getNode(nameA, addressA, []);
-});
+describe('Cluster Exception', () => {
+  beforeAll(async () => {
+    nodeA = await getNode(nameA, addressA, []);
+  });
 
-test('Connects to a non-existent node', async () => {
-  nodeA.addPeer(addressB);
-  nodeA.sendToAll(topic1, message1);
-  await nodeA.close();
-  await new Promise((resolve) => setTimeout(resolve, 400));
-  nodeA.throwOnLeakedReferences();
+  test('Connects to a non-existent node', async () => {
+    nodeA.addPeer(addressB);
+    nodeA.sendToAll(topic1, message1);
+    await nodeA.close();
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    nodeA.throwOnLeakedReferences();
+  });
 });

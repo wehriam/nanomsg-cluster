@@ -40,131 +40,134 @@ const nameA = uuid.v4();
 const nameB = uuid.v4();
 const nameC = uuid.v4();
 
-beforeAll(async () => {
-  nodeA = await getNode(nameA, addressA, []);
-  await messageTimeout();
-});
 
-test('nodeB starts gracefuly.', async () => {
-  nodeB = await getNode(nameB, addressB, []);
-  const nodeAAddPeerBPromise = new Promise((resolve) => {
-    nodeA.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameB) {
-        resolve();
-      }
-    });
+describe('Peer Hosts', () => {
+  beforeAll(async () => {
+    nodeA = await getNode(nameA, addressA, []);
+    await messageTimeout();
   });
-  const nodeBAddPeerAPromise = new Promise((resolve) => {
-    nodeB.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
-    });
-  });
-  nodeB.addPeer(addressA);
-  await nodeAAddPeerBPromise;
-  await nodeBAddPeerAPromise;
-});
 
-test('nodeC starts gracefuly.', async () => {
-  nodeC = await getNode(nameC, addressC, []);
-  const nodeAAddPeerCPromise = new Promise((resolve) => {
-    nodeA.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameC) {
-        resolve();
-      }
+  test('nodeB starts gracefuly.', async () => {
+    nodeB = await getNode(nameB, addressB, []);
+    const nodeAAddPeerBPromise = new Promise((resolve) => {
+      nodeA.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameB) {
+          resolve();
+        }
+      });
     });
-  });
-  const nodeBAddPeerCPromise = new Promise((resolve) => {
-    nodeB.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameC) {
-        resolve();
-      }
+    const nodeBAddPeerAPromise = new Promise((resolve) => {
+      nodeB.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
     });
+    nodeB.addPeer(addressA);
+    await nodeAAddPeerBPromise;
+    await nodeBAddPeerAPromise;
   });
-  const nodeCAddPeerAPromise = new Promise((resolve) => {
-    nodeC.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
-    });
-  });
-  const nodeCAddPeerBPromise = new Promise((resolve) => {
-    nodeC.on('addPeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
-    });
-  });
-  nodeA.addPeer(addressC);
-  await nodeAAddPeerCPromise;
-  await nodeBAddPeerCPromise;
-  await nodeCAddPeerAPromise;
-  await nodeCAddPeerBPromise;
-});
 
-test('Nodes choose a leader.', async () => {
-  const peers = [nameA, nameB, nameC];
-  peers.sort();
-  if (nodeA.isLeader()) {
-    expect(peers[0]).toEqual(nameA);
-  } else {
-    expect(peers[0]).not.toEqual(nameA);
-  }
-  if (nodeB.isLeader()) {
-    expect(peers[0]).toEqual(nameB);
-  } else {
-    expect(peers[0]).not.toEqual(nameB);
-  }
-  if (nodeC.isLeader()) {
-    expect(peers[0]).toEqual(nameC);
-  } else {
-    expect(peers[0]).not.toEqual(nameC);
-  }
-});
+  test('nodeC starts gracefuly.', async () => {
+    nodeC = await getNode(nameC, addressC, []);
+    const nodeAAddPeerCPromise = new Promise((resolve) => {
+      nodeA.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameC) {
+          resolve();
+        }
+      });
+    });
+    const nodeBAddPeerCPromise = new Promise((resolve) => {
+      nodeB.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameC) {
+          resolve();
+        }
+      });
+    });
+    const nodeCAddPeerAPromise = new Promise((resolve) => {
+      nodeC.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
+    });
+    const nodeCAddPeerBPromise = new Promise((resolve) => {
+      nodeC.on('addPeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
+    });
+    nodeA.addPeer(addressC);
+    await nodeAAddPeerCPromise;
+    await nodeBAddPeerCPromise;
+    await nodeCAddPeerAPromise;
+    await nodeCAddPeerBPromise;
+  });
 
-test('nodeC is removed from the cluster by nodeA', async () => {
-  const nodeARemovePeerCPromise = new Promise((resolve) => {
-    nodeA.on('removePeer', (peerAddress) => {
-      if (peerAddress.name === nameC) {
-        resolve();
-      }
-    });
+  test('Nodes choose a leader.', async () => {
+    const peers = [nameA, nameB, nameC];
+    peers.sort();
+    if (nodeA.isLeader()) {
+      expect(peers[0]).toEqual(nameA);
+    } else {
+      expect(peers[0]).not.toEqual(nameA);
+    }
+    if (nodeB.isLeader()) {
+      expect(peers[0]).toEqual(nameB);
+    } else {
+      expect(peers[0]).not.toEqual(nameB);
+    }
+    if (nodeC.isLeader()) {
+      expect(peers[0]).toEqual(nameC);
+    } else {
+      expect(peers[0]).not.toEqual(nameC);
+    }
   });
-  const nodeBRemovePeerCPromise = new Promise((resolve) => {
-    nodeB.on('removePeer', (peerAddress) => {
-      if (peerAddress.name === nameC) {
-        resolve();
-      }
-    });
-  });
-  const nodeCRemovePeerAPromise = new Promise((resolve) => {
-    nodeC.on('removePeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
-    });
-  });
-  const nodeCRemovePeerBPromise = new Promise((resolve) => {
-    nodeC.on('removePeer', (peerAddress) => {
-      if (peerAddress.name === nameB) {
-        resolve();
-      }
-    });
-  });
-  await nodeA.removeHost(localIp);
-  await nodeARemovePeerCPromise;
-  await nodeBRemovePeerCPromise;
-  await nodeCRemovePeerAPromise;
-  await nodeCRemovePeerBPromise;
-});
 
-test('nodes close gracefuly.', async () => {
-  await nodeA.close();
-  await nodeB.close();
-  await nodeC.close();
-  nodeA.throwOnLeakedReferences();
-  nodeB.throwOnLeakedReferences();
-  nodeC.throwOnLeakedReferences();
+  test('nodeC is removed from the cluster by nodeA', async () => {
+    const nodeARemovePeerCPromise = new Promise((resolve) => {
+      nodeA.on('removePeer', (peerAddress) => {
+        if (peerAddress.name === nameC) {
+          resolve();
+        }
+      });
+    });
+    const nodeBRemovePeerCPromise = new Promise((resolve) => {
+      nodeB.on('removePeer', (peerAddress) => {
+        if (peerAddress.name === nameC) {
+          resolve();
+        }
+      });
+    });
+    const nodeCRemovePeerAPromise = new Promise((resolve) => {
+      nodeC.on('removePeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
+    });
+    const nodeCRemovePeerBPromise = new Promise((resolve) => {
+      nodeC.on('removePeer', (peerAddress) => {
+        if (peerAddress.name === nameB) {
+          resolve();
+        }
+      });
+    });
+    await nodeA.removeHost(localIp);
+    await nodeARemovePeerCPromise;
+    await nodeBRemovePeerCPromise;
+    await nodeCRemovePeerAPromise;
+    await nodeCRemovePeerBPromise;
+  });
+
+  test('nodes close gracefuly.', async () => {
+    await nodeA.close();
+    await nodeB.close();
+    await nodeC.close();
+    nodeA.throwOnLeakedReferences();
+    nodeB.throwOnLeakedReferences();
+    nodeC.throwOnLeakedReferences();
+  });
 });
 

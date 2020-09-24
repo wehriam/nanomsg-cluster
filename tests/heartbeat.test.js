@@ -39,48 +39,50 @@ const nameA = uuid.v4();
 const nameB = uuid.v4();
 const nameC = uuid.v4();
 
-beforeAll(async () => {
-  nodeA = await getNode(nameA, addressA, [], 50);
-  nodeB = await getNode(nameB, addressB, [], 50);
-  nodeC = await getNode(nameC, addressC, [], 50);
-  nodeB.addPeer(addressA);
-  nodeA.addPeer(addressC);
-  await messageTimeout();
-});
+describe('Heartbeat', () => {
+  beforeAll(async () => {
+    nodeA = await getNode(nameA, addressA, [], 50);
+    nodeB = await getNode(nameB, addressB, [], 50);
+    nodeC = await getNode(nameC, addressC, [], 50);
+    nodeB.addPeer(addressA);
+    nodeA.addPeer(addressC);
+    await messageTimeout();
+  });
 
 
-test('nodeA closes ungracefully, nodeB and nodeC remove peer.', async () => {
-  const nodeBRemovePeerAPromise = new Promise((resolve) => {
-    nodeB.on('removePeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
+  test('nodeA closes ungracefully, nodeB and nodeC remove peer.', async () => {
+    const nodeBRemovePeerAPromise = new Promise((resolve) => {
+      nodeB.on('removePeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
     });
-  });
-  const nodeCRemovePeerAPromise = new Promise((resolve) => {
-    nodeC.on('removePeer', (peerAddress) => {
-      if (peerAddress.name === nameA) {
-        resolve();
-      }
+    const nodeCRemovePeerAPromise = new Promise((resolve) => {
+      nodeC.on('removePeer', (peerAddress) => {
+        if (peerAddress.name === nameA) {
+          resolve();
+        }
+      });
     });
+    nodeA.stopDiscovery();
+    if (nodeA.clusterUpdateTimeout) {
+      clearTimeout(nodeA.clusterUpdateTimeout);
+    }
+    if (nodeA.clusterHeartbeatInterval) {
+      clearInterval(nodeA.clusterHeartbeatInterval);
+    }
+    await Promise.all(Object.keys(nodeA.pipelinePushSockets).map(nodeA.closePipelinePushSocket.bind(nodeA)));
+    await Promise.all(Object.keys(nodeA.pipelinePullSockets).map(nodeA.closePipelinePullSocket.bind(nodeA)));
+    nodeA.stopHeartbeat();
+    await nodeBRemovePeerAPromise;
+    await nodeCRemovePeerAPromise;
+    await nodeA.close();
+    await nodeB.close();
+    await nodeC.close();
+    nodeA.throwOnLeakedReferences();
+    nodeB.throwOnLeakedReferences();
+    nodeC.throwOnLeakedReferences();
   });
-  nodeA.stopDiscovery();
-  if (nodeA.clusterUpdateTimeout) {
-    clearTimeout(nodeA.clusterUpdateTimeout);
-  }
-  if (nodeA.clusterHeartbeatInterval) {
-    clearInterval(nodeA.clusterHeartbeatInterval);
-  }
-  await Promise.all(Object.keys(nodeA.pipelinePushSockets).map(nodeA.closePipelinePushSocket.bind(nodeA)));
-  await Promise.all(Object.keys(nodeA.pipelinePullSockets).map(nodeA.closePipelinePullSocket.bind(nodeA)));
-  nodeA.stopHeartbeat();
-  await nodeBRemovePeerAPromise;
-  await nodeCRemovePeerAPromise;
-  await nodeA.close();
-  await nodeB.close();
-  await nodeC.close();
-  nodeA.throwOnLeakedReferences();
-  nodeB.throwOnLeakedReferences();
-  nodeC.throwOnLeakedReferences();
 });
 
