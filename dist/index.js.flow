@@ -204,8 +204,10 @@ class ClusterNode extends events.EventEmitter {
     this.subscribe('_clusterRemovePeer', (message:Object, name:string) => {
       const socketSettings = getSocketSettings(this.socketHash);
       if (name !== this.name && socketSettings.host === message.peerAddress.host && socketSettings.pubsubPort === message.peerAddress.pubsubPort && socketSettings.pipelinePort === message.peerAddress.pipelinePort) {
-        const peerSocketSettings = getSocketSettings(message.socketHash);
-        this.removePeer(peerSocketSettings, false);
+        if (message.socketHash) {
+          const peerSocketSettings = getSocketSettings(message.socketHash);
+          this.removePeer(peerSocketSettings, false);
+        }
         return;
       }
       this.removePeer(message.peerAddress, false);
