@@ -35,6 +35,7 @@ const addressC = {
 };
 
 let nodeA;
+let nodeA2;
 let nodeB;
 let nodeC;
 
@@ -44,11 +45,12 @@ const nodeNames = [
   uuid.v4(),
   uuid.v4(),
   uuid.v4(),
+  uuid.v4(),
 ];
 
 nodeNames.sort();
 
-const [nameA, nameB, nameC] = nodeNames;
+const [nameA, nameB, nameC, nameA2] = nodeNames;
 
 describe('Pipeline Reconnect', () => {
   beforeAll(async () => {
@@ -216,6 +218,83 @@ describe('Pipeline Reconnect', () => {
     await nodeB.close();
     await nodeC.close();
     nodeA.throwOnLeakedReferences();
+    nodeB.throwOnLeakedReferences();
+    nodeC.throwOnLeakedReferences();
+  });
+
+  test('Node A, B, and C reconnect and send pipeline events after a heartbeat timeout followed by a connection by a new peer A2', async () => {
+    nodeA = await getNode(nameA, addressA, [], 50);
+    nodeB = await getNode(nameB, addressB, [], 50);
+    nodeC = await getNode(nameC, addressC, [], 50);
+    nodeB.addPeer(addressA);
+    nodeC.addPeer(addressA);
+    await messageTimeout();
+    nodeA.providePipeline(topic);
+    nodeB.providePipeline(topic);
+    nodeC.providePipeline(topic);
+    nodeA.consumePipeline(NANOMSG_TOPIC_PORT_A, topic);
+    nodeB.consumePipeline(NANOMSG_TOPIC_PORT_B, topic);
+    nodeC.consumePipeline(NANOMSG_TOPIC_PORT_C, topic);
+    await messageTimeout();
+    expect(nodeA.isLeader()).toEqual(true);
+    expect(nodeB.isLeader()).toEqual(false);
+    expect(nodeC.isLeader()).toEqual(false);
+    expect(nodeA.isLeader(nameA)).toEqual(true);
+    expect(nodeB.isLeader(nameA)).toEqual(true);
+    expect(nodeC.isLeader(nameA)).toEqual(true);
+    expect(nodeA.isLeader(nameB)).toEqual(false);
+    expect(nodeB.isLeader(nameB)).toEqual(false);
+    expect(nodeC.isLeader(nameB)).toEqual(false);
+    expect(nodeA.isLeader(nameC)).toEqual(false);
+    expect(nodeB.isLeader(nameC)).toEqual(false);
+    expect(nodeC.isLeader(nameC)).toEqual(false);
+    expect(new Set(nodeA.pipelineConsumers(topic))).toEqual(new Set([nameA, nameB, nameC]));
+    expect(new Set(nodeB.pipelineConsumers(topic))).toEqual(new Set([nameA, nameB, nameC]));
+    expect(new Set(nodeC.pipelineConsumers(topic))).toEqual(new Set([nameA, nameB, nameC]));
+    nodeA.stopHeartbeat();
+    await messageTimeout();
+    // Node A is leader of itself
+    expect(nodeA.isLeader()).toEqual(true);
+    expect(nodeB.isLeader()).toEqual(true);
+    expect(nodeC.isLeader()).toEqual(false);
+    expect(nodeA.isLeader(nameA)).toEqual(true);
+    expect(nodeB.isLeader(nameA)).toEqual(false);
+    expect(nodeC.isLeader(nameA)).toEqual(false);
+    expect(nodeA.isLeader(nameB)).toEqual(false);
+    expect(nodeB.isLeader(nameB)).toEqual(true);
+    expect(nodeC.isLeader(nameB)).toEqual(true);
+    expect(nodeA.isLeader(nameC)).toEqual(false);
+    expect(nodeB.isLeader(nameC)).toEqual(false);
+    expect(nodeC.isLeader(nameC)).toEqual(false);
+    expect(new Set(nodeA.pipelineConsumers(topic))).toEqual(new Set([nameA]));
+    expect(new Set(nodeB.pipelineConsumers(topic))).toEqual(new Set([nameB, nameC]));
+    expect(new Set(nodeC.pipelineConsumers(topic))).toEqual(new Set([nameB, nameC]));
+    await nodeA.close();
+    nodeA2 = await getNode(nameA2, addressA, [], 50);
+    await nodeA2.addPeer(addressB);
+    nodeA2.providePipeline(topic);
+    nodeA2.consumePipeline(NANOMSG_TOPIC_PORT_A, topic);
+    await messageTimeout();
+    expect(nodeA2.isLeader()).toEqual(false);
+    expect(nodeB.isLeader()).toEqual(true);
+    expect(nodeC.isLeader()).toEqual(false);
+    expect(nodeA2.isLeader(nameA2)).toEqual(false);
+    expect(nodeB.isLeader(nameA2)).toEqual(false);
+    expect(nodeC.isLeader(nameA2)).toEqual(false);
+    expect(nodeA2.isLeader(nameB)).toEqual(true);
+    expect(nodeB.isLeader(nameB)).toEqual(true);
+    expect(nodeC.isLeader(nameB)).toEqual(true);
+    expect(nodeA2.isLeader(nameC)).toEqual(false);
+    expect(nodeB.isLeader(nameC)).toEqual(false);
+    expect(nodeC.isLeader(nameC)).toEqual(false);
+    expect(new Set(nodeA2.pipelineConsumers(topic))).toEqual(new Set([nameA2, nameB, nameC]));
+    expect(new Set(nodeB.pipelineConsumers(topic))).toEqual(new Set([nameA2, nameB, nameC]));
+    expect(new Set(nodeC.pipelineConsumers(topic))).toEqual(new Set([nameA2, nameB, nameC]));
+    await nodeA2.close();
+    await nodeB.close();
+    await nodeC.close();
+    nodeA.throwOnLeakedReferences();
+    nodeA2.throwOnLeakedReferences();
     nodeB.throwOnLeakedReferences();
     nodeC.throwOnLeakedReferences();
   });
