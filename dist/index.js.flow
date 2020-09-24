@@ -333,6 +333,27 @@ class ClusterNode extends events.EventEmitter {
     delete this.localSubscriptions[topic];
   }
 
+  // Used for simulating broken closes in test scenarios
+  async dirtyClose():Promise<void> {
+    this.stopDiscovery();
+    await Promise.all(Object.keys(this.pipelinePullSockets).map(this.closePipelinePullSocket.bind(this)));
+    await Promise.all(Object.keys(this.pipelinePushSockets).map(this.closePipelinePushSocket.bind(this)));
+    await new Promise((resolve) => {
+      if (this.pubSocket.closed) {
+        resolve();
+      }
+      this.pullSocket.on('close', resolve);
+      this.pullSocket.close();
+    });
+    await new Promise((resolve) => {
+      if (this.pubSocket.closed) {
+        resolve();
+      }
+      this.pubSocket.on('close', resolve);
+      this.pubSocket.close();
+    });
+  }
+
   async close():Promise<void> {
     if (this.closed) {
       throw new Error('Already closed.');
