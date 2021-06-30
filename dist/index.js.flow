@@ -344,7 +344,7 @@ class ClusterNode extends events.EventEmitter {
     await Promise.all(Object.keys(this.pipelinePullSockets).map(this.closePipelinePullSocket.bind(this)));
     await Promise.all(Object.keys(this.pipelinePushSockets).map(this.closePipelinePushSocket.bind(this)));
     await new Promise((resolve) => {
-      if (this.pubSocket.closed) {
+      if (this.pullSocket.closed) {
         resolve();
       }
       this.pullSocket.on('close', resolve);
@@ -401,7 +401,7 @@ class ClusterNode extends events.EventEmitter {
     }
     await Promise.all(closePromises);
     await new Promise((resolve) => {
-      if (this.pubSocket.closed) {
+      if (this.pullSocket.closed) {
         resolve();
       }
       this.pullSocket.on('close', resolve);
