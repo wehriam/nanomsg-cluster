@@ -341,22 +341,26 @@ class ClusterNode extends events.EventEmitter {
   // Used for simulating broken closes in test scenarios
   async dirtyClose()               {
     this.stopDiscovery();
-    await Promise.all(Object.keys(this.pipelinePullSockets).map(this.closePipelinePullSocket.bind(this)));
-    await Promise.all(Object.keys(this.pipelinePushSockets).map(this.closePipelinePushSocket.bind(this)));
-    await new Promise((resolve) => {
-      if (this.pullSocket.closed) {
-        resolve();
-      }
-      this.pullSocket.on('close', resolve);
-      this.pullSocket.close();
-    });
-    await new Promise((resolve) => {
-      if (this.pubSocket.closed) {
-        resolve();
-      }
-      this.pubSocket.on('close', resolve);
-      this.pubSocket.close();
-    });
+    for (const topic of Object.keys(this.pipelinePullSockets)) {
+      await this.closePipelinePullSocket(topic);
+    }
+    for (const topic of Object.keys(this.pipelinePushSockets)) {
+      await this.closePipelinePushSocket(topic);
+    }
+    if (!this.pullSocket.closed) {
+      await new Promise((resolve, reject) => {
+        this.pullSocket.on('close', resolve);
+        this.pullSocket.on('error', reject);
+        this.pullSocket.close();
+      });
+    }
+    if (!this.pubSocket.closed) {
+      await new Promise((resolve, reject) => {
+        this.pubSocket.on('close', resolve);
+        this.pubSocket.on('error', reject);
+        this.pubSocket.close();
+      });
+    }
   }
 
   async close()               {
@@ -374,18 +378,23 @@ class ClusterNode extends events.EventEmitter {
     if (this.clusterHeartbeatInterval) {
       clearInterval(this.clusterHeartbeatInterval);
     }
-    await Promise.all(Object.keys(this.pipelinePullSockets).map(this.stopConsumingPipeline.bind(this)));
-    await Promise.all(Object.keys(this.pipelinePushSockets).map(this.stopProvidingPipeline.bind(this)));
+    for (const topic of Object.keys(this.pipelinePullSockets)) {
+      await this.stopConsumingPipeline(topic);
+    }
+    for (const topic of Object.keys(this.pipelinePushSockets)) {
+      await this.stopProvidingPipeline(topic);
+    }
     this.sendToAll('_clusterRemovePeer', {
       socketHash: this.socketHash,
       peerAddress: getSocketSettings(this.socketHash),
     });
     await new Promise((resolve) => setTimeout(resolve, 100));
-    const closePromises = [];
+    // const closePromises = [];
     for (const socketSettings of this.getPeers()) {
-      closePromises.push(new Promise((resolve) => {
+      await new Promise((resolve) => {
         const timeout = setTimeout(() => {
           this.removeListener('removePeer', handleRemovePeer);
+          this.emit('error', new Error(`Timeout waiting to remove peer ${JSON.stringify(socketSettings)}`));
           resolve();
         }, 1000);
         const handleRemovePeer = (sSettings) => {
@@ -396,24 +405,29 @@ class ClusterNode extends events.EventEmitter {
           }
         };
         this.on('removePeer', handleRemovePeer);
-      }));
-      this.removePeer(socketSettings, false);
+        this.removePeer(socketSettings, false);
+      });
     }
-    await Promise.all(closePromises);
-    await new Promise((resolve) => {
-      if (this.pullSocket.closed) {
-        resolve();
-      }
-      this.pullSocket.on('close', resolve);
-      this.pullSocket.close();
-    });
-    await new Promise((resolve) => {
-      if (this.pubSocket.closed) {
-        resolve();
-      }
-      this.pubSocket.on('close', resolve);
-      this.pubSocket.close();
-    });
+    if (!this.pullSocket.closed) {
+      await new Promise((resolve) => {
+        this.pullSocket.on('close', resolve);
+        this.pullSocket.on('error', (error) => {
+          this.emit('error', error);
+          resolve();
+        });
+        this.pullSocket.close();
+      });
+    }
+    if (!this.pubSocket.closed) {
+      await new Promise((resolve) => {
+        this.pubSocket.on('close', resolve);
+        this.pubSocket.on('error', (error) => {
+          this.emit('error', error);
+          resolve();
+        });
+        this.pubSocket.close();
+      });
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
     this.unsubscribe('_clusterAddPeers');
     this.unsubscribe('_clusterRemovePeer');
@@ -438,7 +452,7 @@ class ClusterNode extends events.EventEmitter {
       this.unnamedPeerSocketHashes[getUnnamedSocketHash(peerAddress)] = true;
       const sub = nano.socket('sub', socketOptions);
       sub.on('error', (error) => {
-        this.emit('error', `Sub socket "${pubsubConnectAddress}": ${error.message}`);
+        this.emit('error', new Error(`Sub socket "${pubsubConnectAddress}": ${error.message}`));
       });
       try {
         sub.connect(pubsubConnectAddress);
@@ -570,10 +584,8 @@ class ClusterNode extends events.EventEmitter {
       removedPeers.push(peerAddress);
     }
     delete this.unnamedPeerSocketHashes[getUnnamedSocketHash(peerAddress)];
-    await Promise.all([
-      this.closeSubSocket(pubsubConnectAddress),
-      this.closePushSocket(pushConnectAddress),
-    ]);
+    await this.closeSubSocket(pubsubConnectAddress);
+    await this.closePushSocket(pushConnectAddress);
     for (const removedPeer of removedPeers) {
       this.emit('removePeer', removedPeer);
     }
@@ -591,9 +603,12 @@ class ClusterNode extends events.EventEmitter {
     if (sub.closed) {
       return;
     }
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve) => {
       sub.on('close', resolve);
-      sub.on('error', reject);
+      sub.on('error', (error) => {
+        this.emit('error', error);
+        resolve();
+      });
       sub.close();
     });
   }
@@ -607,9 +622,12 @@ class ClusterNode extends events.EventEmitter {
     if (push.closed) {
       return;
     }
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve) => {
       push.on('close', resolve);
-      push.on('error', reject);
+      push.on('error', (error) => {
+        this.emit('error', error);
+        resolve();
+      });
       push.close();
     });
   }
@@ -637,9 +655,12 @@ class ClusterNode extends events.EventEmitter {
     if (push.closed) {
       return;
     }
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve) => {
       push.on('close', resolve);
-      push.on('error', reject);
+      push.on('error', (error) => {
+        this.emit('error', error);
+        resolve();
+      });
       push.close();
     });
   }
@@ -655,9 +676,12 @@ class ClusterNode extends events.EventEmitter {
     if (pullSocket.closed) {
       return;
     }
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve) => {
       pullSocket.on('close', resolve);
-      pullSocket.on('error', reject);
+      pullSocket.on('error', (error) => {
+        this.emit('error', error);
+        resolve();
+      });
       pullSocket.close();
     });
   }
@@ -728,7 +752,7 @@ class ClusterNode extends events.EventEmitter {
     }
     const push = nano.socket('push', socketOptions);
     push.on('error', (error) => {
-      this.emit('error', `Pipeline push socket for topic "${topic}": ${error.message}`);
+      this.emit('error', new Error(`Pipeline push socket for topic "${topic}": ${error.message}`));
     });
     this.pipelinePushSockets[topic] = push;
     this.sendToAll('_clusterAddPipelineProvider', {

@@ -29,6 +29,9 @@ const closeNode = async (name:string) => {
   const node = nodes[name];
   delete addresses[name];
   delete nodes[name];
+  if (node.closed) {
+    return;
+  }
   await node.close();
 };
 
@@ -206,7 +209,7 @@ describe('Pipeline Reconnect', () => {
     nodeC.throwOnLeakedReferences();
   });
 
-  test('Node A, B, and C reconnect and send pipeline events after a heartbeat timeout followed by a connection by a new peer A2', async () => {
+  test.skip('Node A, B, and C reconnect and send pipeline events after a heartbeat timeout followed by a connection by a new peer A2', async () => {
     const spawnedNodes = await Promise.all([spawnNode(), spawnNode(), spawnNode()]);
     spawnedNodes.sort((x, y) => (x.name < y.name ? -1 : 1));
     const [nodeA, nodeB, nodeC] = spawnedNodes;
@@ -282,7 +285,8 @@ describe('Pipeline Reconnect', () => {
     expect(new Set(nodeA2.pipelineConsumers(topic))).toEqual(new Set([nameA2, nameB, nameC]));
     expect(new Set(nodeB.pipelineConsumers(topic))).toEqual(new Set([nameA2, nameB, nameC]));
     expect(new Set(nodeC.pipelineConsumers(topic))).toEqual(new Set([nameA2, nameB, nameC]));
-    await nodeA2.close();
+    //await nodeA2.close();
+    await closeNode(nameA2);
     await closeNode(nameB);
     await closeNode(nameC);
     nodeA.throwOnLeakedReferences();
