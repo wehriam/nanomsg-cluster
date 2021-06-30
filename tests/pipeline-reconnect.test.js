@@ -285,7 +285,6 @@ describe('Pipeline Reconnect', () => {
     expect(new Set(nodeA2.pipelineConsumers(topic))).toEqual(new Set([nameA2, nameB, nameC]));
     expect(new Set(nodeB.pipelineConsumers(topic))).toEqual(new Set([nameA2, nameB, nameC]));
     expect(new Set(nodeC.pipelineConsumers(topic))).toEqual(new Set([nameA2, nameB, nameC]));
-    //await nodeA2.close();
     await closeNode(nameA2);
     await closeNode(nameB);
     await closeNode(nameC);
