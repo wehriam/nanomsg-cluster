@@ -20,6 +20,7 @@
     }
   },
   "jest": {
+    "testEnvironment": "node",
     "coverageDirectory": "./coverage/",
     "collectCoverage": true,
     "collectCoverageFrom": [
@@ -38,9 +39,10 @@
     ]
   },
   "dependencies": {
-    "@msgpack/msgpack": "^1.12.2",
     "lodash": "^4.17.20",
-    "nanomsg": "^4.1.0",
+    "msgpackr": "^1.5.1",
+    "msgpackr-extract": "^1.0.16",
+    "nanomsg": "https://github.com/den1zk/node-nanomsg.git#1186d5f5e529379f576937dbd65b23b5fe51f6be",
     "node-discover": "^1.1.3",
     "uuid": "^8.3.0"
   },

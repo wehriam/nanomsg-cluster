@@ -35,7 +35,7 @@ const closeNode = async (name:string) => {
   await node.close();
 };
 
-describe('Pipeline Reconnect', () => {
+describe.skip('Pipeline Reconnect', () => {
   beforeAll(async () => {
     await messageTimeout();
   });
@@ -209,7 +209,7 @@ describe('Pipeline Reconnect', () => {
     nodeC.throwOnLeakedReferences();
   });
 
-  test.skip('Node A, B, and C reconnect and send pipeline events after a heartbeat timeout followed by a connection by a new peer A2', async () => {
+  test('Node A, B, and C reconnect and send pipeline events after a heartbeat timeout followed by a connection by a new peer A2', async () => {
     const spawnedNodes = await Promise.all([spawnNode(), spawnNode(), spawnNode()]);
     spawnedNodes.sort((x, y) => (x.name < y.name ? -1 : 1));
     const [nodeA, nodeB, nodeC] = spawnedNodes;
@@ -294,7 +294,7 @@ describe('Pipeline Reconnect', () => {
     nodeC.throwOnLeakedReferences();
   });
 
-  test.skip('Node A, B, and C reconnect and send pipeline events after a dirty disconnect, followed by a connection by a new peer A2 from the same ports', async () => {
+  test('Node A, B, and C reconnect and send pipeline events after a dirty disconnect, followed by a connection by a new peer A2 from the same ports', async () => {
     const spawnedNodes = await Promise.all([spawnNode(), spawnNode(), spawnNode()]);
     spawnedNodes.sort((x, y) => (x.name < y.name ? -1 : 1));
     const [nodeA, nodeB, nodeC] = spawnedNodes;
