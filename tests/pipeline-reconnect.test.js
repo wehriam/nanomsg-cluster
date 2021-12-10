@@ -35,7 +35,7 @@ const closeNode = async (name:string) => {
   await node.close();
 };
 
-describe.skip('Pipeline Reconnect', () => {
+describe('Pipeline Reconnect', () => {
   beforeAll(async () => {
     await messageTimeout();
   });

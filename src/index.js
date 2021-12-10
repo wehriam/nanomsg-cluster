@@ -5,7 +5,13 @@ const nano = require('nanomsg');
 const events = require('events');
 const { merge, without } = require('lodash');
 const Discover = require('node-discover');
-const { pack, unpack } = require('msgpackr');
+const { Packr } = require('msgpackr');
+
+const packr = new Packr({ copyBuffers: true });
+
+const encode = (o:any) => packr.pack(o);
+
+const decode = (b:Buffer) => packr.unpack(b);
 
 export type SocketSettings = {
   name?: string,
@@ -46,7 +52,7 @@ type Options = {
 const DEFAULT_PUBSUB_PORT = 13001;
 const DEFAULT_PIPELINE_PORT = 13002;
 
-const socketOptions = { sndbuf: 4194304, dontwait: true, rcvbuf: 4194304, rcvmaxsize: 4194304, tcpnodelay: true };
+const socketOptions = { sndbuf: 4194304, dontwait: true, rcvbuf: 4194304, rcvmaxsize: 4194304 };
 
 const getSocketHash = (name:string, socketSettings: SocketSettings):string => `${name}/${socketSettings.host}/${socketSettings.pubsubPort || DEFAULT_PUBSUB_PORT}/${socketSettings.pipelinePort || DEFAULT_PIPELINE_PORT}`;
 
@@ -186,7 +192,7 @@ class ClusterNode extends events.EventEmitter {
           const pushConnectAddress = `tcp://${socketSettings.host}:${socketSettings.pipelinePort || DEFAULT_PIPELINE_PORT}`;
           const push = this.pushSockets[pushConnectAddress];
           if (push) {
-            push.send(pack(['_clusterAddPeers', {
+            push.send(encode(['_clusterAddPeers', {
               socketHash: this.socketHash,
               peerSocketHashes: Object.keys(this.peerSocketHashes),
             }]));
@@ -275,7 +281,7 @@ class ClusterNode extends events.EventEmitter {
   }
 
   receiveMessage(buffer:Buffer):void {
-    const [topic, message, name] = unpack(buffer);
+    const [topic, message, name] = decode(buffer);
     if (!this.subscriptions[topic]) {
       return;
     }
@@ -290,11 +296,11 @@ class ClusterNode extends events.EventEmitter {
       this.emit('error', `${this.name} is unable to send message "${topic}":"${JSON.stringify(message)}" to "${name}"`);
       return;
     }
-    push.send(pack([topic, message, this.name]));
+    push.send(encode([topic, message, this.name]));
   }
 
   sendToAll(topic:string, message:any):void {
-    this.pubSocket.send(pack([topic, message, this.name]));
+    this.pubSocket.send(encode([topic, message, this.name]));
     if (!this.localSubscriptions[topic]) {
       return;
     }
@@ -308,7 +314,7 @@ class ClusterNode extends events.EventEmitter {
     if (!push) {
       throw new Error(`Not providing pipeline "${topic}"`);
     }
-    push.send(pack([topic, message, this.name]));
+    push.send(encode([topic, message, this.name]));
   }
 
   subscribe(topic:string, callback:Function, includeLocal?:boolean):void {
@@ -482,7 +488,7 @@ class ClusterNode extends events.EventEmitter {
         throw new Error(`Could not connect push socket to ${pushConnectAddress}`);
       }
       this.pushSockets[pushConnectAddress] = push;
-      push.send(pack(['_clusterAddPeers', {
+      push.send(encode(['_clusterAddPeers', {
         socketHash: this.socketHash,
         peerSocketHashes: Object.keys(this.peerSocketHashes),
       }]));

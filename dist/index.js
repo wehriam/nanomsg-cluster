@@ -5,7 +5,13 @@ const nano = require('nanomsg');
 const events = require('events');
 const { merge, without } = require('lodash');
 const Discover = require('node-discover');
-const { encode, decode } = require('@msgpack/msgpack');
+const { Packr } = require('msgpackr');
+
+const packr = new Packr({ copyBuffers: true });
+
+const encode = (o    ) => packr.pack(o);
+
+const decode = (b       ) => packr.unpack(b);
 
                               
                 
