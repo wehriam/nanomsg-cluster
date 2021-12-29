@@ -442,7 +442,6 @@ class ClusterNode extends events.EventEmitter {
     this.unsubscribe('_clusterRemovePipelineConsumer');
     this.unsubscribe('_clusterAddPipelineProvider');
     this.unsubscribe('_clusterHeartbeat');
-    this.unsubscribe('_clusterAddPeers');
     this.closed = true;
     this.emit('close');
   }
